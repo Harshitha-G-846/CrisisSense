@@ -18,26 +18,6 @@ spacy
 transformers
 sentence-transformers
 
-# Computer Vision / Images / Video
-opencv-python
-Pillow
-
-# OCR
-pytesseract
-easyocr
-
-# Audio / Speech-to-Text
-faster-whisper
-
 # Geolocation / Web
 requests
 
-# Database
-sqlalchemy
-
-# RAG / Vector Search
-faiss-cpu
-
-# Optional LLM / Agentic Workflow
-langchain
-langgraph
