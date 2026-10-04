@@ -122,3 +122,22 @@ def test_iso_date_and_relative_boundary():
     old_ev = extract_temporal_evidence(old_text, reference_date=REF_DATE)
     assert len(old_ev) == 1
     assert old_ev[0].polarity == EvidencePolarity.OLD
+
+
+def test_vague_relative_phrases_detected_as_old():
+    phrases = [
+        "This earthquake happened several years ago.",
+        "This earthquake happened a few years ago.",
+        "This earthquake happened many years ago.",
+        "This earthquake happened a couple of years ago.",
+        "The wildfire occurred couple of years ago.",
+        "The bridge collapsed few years ago.",
+    ]
+    for text in phrases:
+        ev = extract_temporal_evidence(text, reference_date=REF_DATE)
+        assert len(ev) >= 1, f"Failed to extract evidence for: {text!r}"
+        assert any(e.polarity == EvidencePolarity.OLD for e in ev), (
+            f"Expected OLD polarity for: {text!r}, got {[e.polarity for e in ev]}"
+        )
+        assert any("relative_ago" in e.details.get("type", "") for e in ev)
+

@@ -22,7 +22,8 @@ MONTH_MAP = {
 WORD_TO_NUM = {
     "one": 1, "two": 2, "three": 3, "four": 4,
     "five": 5, "six": 6, "seven": 7, "eight": 8,
-    "nine": 9, "ten": 10, "a": 1, "an": 1
+    "nine": 9, "ten": 10, "a": 1, "an": 1,
+    "couple": 2, "few": 3, "several": 5, "many": 10
 }
 
 
@@ -350,15 +351,18 @@ def extract_temporal_evidence(
         )
 
     # "two days ago" / "N days ago" / "N weeks ago" / "N months ago" / "N years ago"
-    num_words_or_digits = r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an)"
+    # Also supports vague quantifiers: "several years ago", "a few years ago", "many years ago", "a couple of years ago"
+    num_words_or_digits = r"(\d+|one|two|three|four|five|six|seven|eight|nine|ten|a|an|several|many|(?:a\s+)?few|(?:a\s+)?couple(?:\s+of)?)"
     ago_pattern = rf"\b{num_words_or_digits}\s+(days?|weeks?|months?|years?)\s+ago\b"
     for match in re.finditer(ago_pattern, text, re.IGNORECASE):
         span = match.span()
         if is_covered(*span):
             continue
-        raw_num = match.group(1).lower()
+        raw_num = match.group(1).lower().strip()
         unit = match.group(2).lower()
-        num_val = int(raw_num) if raw_num.isdigit() else WORD_TO_NUM.get(raw_num, 1)
+        clean_num = re.sub(r"^(?:a|an)\s+", "", raw_num)
+        clean_num = re.sub(r"\s+of$", "", clean_num).strip()
+        num_val = int(clean_num) if clean_num.isdigit() else WORD_TO_NUM.get(clean_num, 1)
 
         if "day" in unit and num_val <= 2:
             polarity = EvidencePolarity.CURRENT

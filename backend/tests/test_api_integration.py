@@ -10,7 +10,7 @@ import io
 import os
 import numpy as np
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 from fastapi.testclient import TestClient
 
 from main import app
@@ -268,3 +268,34 @@ def test_image_only_no_text():
     assert m1["locations"] == []
     # Member 2 should still attempt image evidence extraction
     assert isinstance(body["currentness"]["evidence"], list)
+
+
+# ---------------------------------------------------------------------------
+# 13. End-to-end OCR conflict detection with tesseract
+# ---------------------------------------------------------------------------
+
+def test_end_to_end_ocr_conflict_detection():
+    # Render clear 2015 date on white background
+    img = Image.new("RGB", (600, 150), color="white")
+    draw = ImageDraw.Draw(img)
+    draw.text((30, 50), "DATE: 2015-04-25", fill="black")
+    img_scaled = img.resize((1200, 300), Image.Resampling.LANCZOS)
+
+    buf = io.BytesIO()
+    img_scaled.save(buf, format="PNG")
+    buf.seek(0)
+
+    resp = client.post(
+        "/analyze",
+        data={"text": "This fire is happening today."},
+        files={"image": ("archive_2015.png", buf.read(), "image/png")},
+    )
+    assert resp.status_code == 200
+    curr = resp.json()["currentness"]
+    assert curr["currentness"] == "UNCERTAIN"
+    assert curr["action"] == "HUMAN_VERIFICATION_REQUIRED"
+    assert len(curr["conflicts_detected"]) > 0
+    # Must have both CURRENT text evidence and OLD OCR evidence
+    assert any(ev["source"] == "ocr" and ev["polarity"] == "OLD" for ev in curr["evidence"])
+    assert any(ev["source"] == "text" and ev["polarity"] == "CURRENT" for ev in curr["evidence"])
+
