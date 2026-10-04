@@ -21,3 +21,8 @@ sentence-transformers
 # Geolocation / Web
 requests
 
+# Multimodal & Vision (Member 2)
+pillow
+pytesseract
+imagehash
+opencv-python-headless
