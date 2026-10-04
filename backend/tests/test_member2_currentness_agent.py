@@ -323,3 +323,63 @@ def test_reference_date_iso_string_and_datetime():
         reference_date="2026-10-04",
     )
     assert any(e.polarity == EvidencePolarity.CURRENT for e in result_str.evidence)
+
+
+# ---------------------------------------------------------------------------
+# Task 3: Explicit Scenario Tests
+# ---------------------------------------------------------------------------
+
+def test_text_says_today_produces_current_evidence():
+    result = run_currentness_verification(
+        text="Flood waters reached danger levels today",
+        reference_date=REF_DATE,
+    )
+    assert result.currentness == CurrentnessVerdict.CURRENT
+    current_items = [e for e in result.evidence if e.polarity == EvidencePolarity.CURRENT]
+    assert len(current_items) >= 1
+    assert current_items[0].source == EvidenceSource.TEXT
+
+
+def test_text_says_in_2021_produces_old_evidence():
+    result = run_currentness_verification(
+        text="The explosion in 2021 killed dozens of workers",
+        reference_date=REF_DATE,
+    )
+    assert result.currentness == CurrentnessVerdict.OLD
+    old_items = [e for e in result.evidence if e.polarity == EvidencePolarity.OLD]
+    assert len(old_items) >= 1
+    assert old_items[0].source == EvidenceSource.TEXT
+
+
+def test_ocr_contains_old_date_produces_old(tmp_path):
+    img_path = str(tmp_path / "old_date_ocr.png")
+    _make_image(img_path)
+    result = run_currentness_verification(
+        image_path=img_path,
+        ocr_text_override="Archived incident report: 15 March 2017",
+        reference_date=REF_DATE,
+    )
+    assert result.currentness == CurrentnessVerdict.OLD
+    assert any(e.source == EvidenceSource.OCR and e.polarity == EvidencePolarity.OLD for e in result.evidence)
+
+
+def test_strong_current_evidence_produces_current():
+    result = run_currentness_verification(
+        text="Breaking emergency: Flash flood happening now in city center today!",
+        reference_date=REF_DATE,
+    )
+    assert result.currentness == CurrentnessVerdict.CURRENT
+    assert result.action == VerificationAction.ALLOW
+    assert result.confidence >= 0.55
+
+
+def test_strong_old_evidence_produces_old():
+    result = run_currentness_verification(
+        text="Historical footage from the 2018 cyclone disaster in Tamil Nadu.",
+        transcript_override="This entire event occurred in 2018.",
+        reference_date=REF_DATE,
+    )
+    assert result.currentness == CurrentnessVerdict.OLD
+    assert result.action == VerificationAction.ALLOW
+    assert result.confidence >= 0.55
+
