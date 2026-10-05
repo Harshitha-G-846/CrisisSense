@@ -27,3 +27,4 @@ pytesseract
 imagehash
 opencv-python-headless
 faster-whisper
+python-multipart
