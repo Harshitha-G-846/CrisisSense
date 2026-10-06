@@ -1,61 +1,65 @@
-APPROVED — proceed with PHASE 1.
+from transformers import pipeline
 
-Before coding, follow these constraints strictly:
 
-1. Create ONLY:
-   backend/member2/schemas.py
-   backend/tests/test_member2_contract.py
+# ==========================================
+# LOAD ZERO-SHOT SEVERITY MODEL
+# ==========================================
 
-2. Do NOT modify:
-   - Member 1
-   - main.py
-   - requirements.txt
-   - datasets
-   - models
+severity_model = pipeline(
+    "zero-shot-classification",
+    model="facebook/bart-large-mnli"
+)
 
-3. Keep the implementation small and precise.
-   No unnecessary abstractions.
 
-4. Do not create additional folders/files.
+# ==========================================
+# SEVERITY LABELS
+# ==========================================
 
-5. Define the minimum stable Pydantic schemas needed for:
-   - EvidenceItem
-   - CurrentnessResult
-   - Member1Context
-   - extracted details if genuinely necessary
-   - currentness/action enums
+severity_labels = [
+    "low severity emergency",
+    "medium severity emergency",
+    "high severity emergency",
+    "critical life-threatening emergency"
+]
 
-6. Use:
-   CURRENT | OLD | UNCERTAIN
 
-   and:
+# ==========================================
+# SEVERITY PREDICTION
+# ==========================================
 
-   ALLOW | HUMAN_VERIFICATION_REQUIRED
+def extract_severity(text):
 
-7. Evidence must distinguish:
-   - supporting CURRENT evidence
-   - supporting OLD evidence
-   - neutral/missing evidence
+    result = severity_model(
+        text,
+        candidate_labels=severity_labels,
+        multi_label=False
+    )
 
-   "No reuse match found" must NOT be treated as proof that media is current.
+    predicted_label = result["labels"][0]
 
-8. Add concise contract tests covering:
-   - valid CURRENT result
-   - valid OLD result
-   - valid UNCERTAIN result
-   - confidence range 0.0–1.0
-   - invalid enum values
-   - malformed evidence
+    if predicted_label == "low severity emergency":
+        return "LOW"
 
-9. Do NOT implement temporal logic yet.
+    elif predicted_label == "medium severity emergency":
+        return "MEDIUM"
 
-10. Do NOT implement OCR, video, audio, reuse detection, fusion, or API yet.
+    elif predicted_label == "high severity emergency":
+        return "HIGH"
 
-11. After implementation:
-   - run the contract tests
-   - report exactly what files changed
-   - report test results
-   - briefly explain the schema
+    elif predicted_label == "critical life-threatening emergency":
+        return "CRITICAL"
 
-Do not continue to Phase 2 automatically.
-STOP after Phase 1.
+    return "UNKNOWN"
+
+
+# ==========================================
+# TEST
+# ==========================================
+
+if __name__ == "__main__":
+
+    text = input("\nEnter crisis text: ")
+
+    severity = extract_severity(text)
+
+    print("\nSeverity:", severity)
