@@ -6,8 +6,22 @@ Member 1 (crisis analysis) + Member 2 (multimodal currentness verification)
   - JSON body  (text-only, backwards compatible)
   - multipart/form-data  (text + optional image/video/audio)
 """
-
 from __future__ import annotations
+
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from member3.database import get_db
+from member3.report_service import save_report
+from member3.incident_service import create_incident_from_report
+from sqlalchemy import select, func
+from member3.models import Incident, Report
+from typing import Literal
+from fastapi import Query
+from member3.models import Resource
+from member3.resource_service import recommend_resources
+from datetime import timezone
+from member3.models import utc_now
 
 import os
 import tempfile
@@ -120,22 +134,42 @@ class CrisisRequest(BaseModel):
 
 
 @app.post("/analyze-text")
-def analyze_text(request: CrisisRequest):
-    """
-    Backwards-compatible text-only endpoint (JSON body).
-    Returns Member 1 crisis analysis + Member 2 currentness verification.
-    """
+def analyze_text(
+    request: CrisisRequest,
+    db: Session = Depends(get_db),
+):
+    if not request.text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Report text cannot be empty.",
+        )
+
+    # Member 1: identify crisis details.
     m1_result = analyze_crisis(request.text)
     m1_context = _build_member1_context(m1_result)
 
+    # Member 2: assess currentness and collect evidence.
     currentness_result = run_currentness_verification(
         text=request.text,
         member1_context=m1_context,
     )
+    currentness_data = _format_currentness(currentness_result)
+
+    # Member 3: preserve the original text and both outputs.
+    report = save_report(
+        db=db,
+        original_text=request.text,
+        crisis_analysis=m1_result,
+        currentness_assessment=currentness_data,
+    )
+
+    create_incident_from_report(db=db, report=report)
 
     return {
+        "report_id": report.id,
+        "incident_id": report.incident_id,
         "crisis_analysis": m1_result,
-        "currentness": _format_currentness(currentness_result),
+        "currentness": currentness_data,
     }
 
 
@@ -147,6 +181,7 @@ async def analyze(
     image: Optional[UploadFile] = File(default=None),
     video: Optional[UploadFile] = File(default=None),
     audio: Optional[UploadFile] = File(default=None),
+    db: Session = Depends(get_db),
 ):
     """
     Multimodal /analyze endpoint.
@@ -234,7 +269,237 @@ async def analyze(
             except OSError:
                 pass
 
+    currentness_data = _format_currentness(currentness_result)
+
+    report_id = None
+    incident_id = None
+    storage_status = "NOT_SAVED_MEDIA_ONLY"
+
+    if text and text.strip():
+        report = save_report(
+            db=db,
+            original_text=text.strip(),
+            crisis_analysis=m1_result,
+            currentness_assessment=currentness_data,
+        )
+
+        create_incident_from_report(db=db, report=report)
+
+        report_id = report.id
+        incident_id = report.incident_id
+        storage_status = "SAVED"
+
     return {
+        "report_id": report_id,
+        "incident_id": incident_id,
+        "storage_status": storage_status,
         "crisis_analysis": m1_result,
-        "currentness": _format_currentness(currentness_result),
+        "currentness": currentness_data,
+    }
+
+@app.get("/incidents")
+def list_incidents(db: Session = Depends(get_db)):
+    statement = (
+        select(
+            Incident,
+            func.count(Report.id).label("report_count"),
+        )
+        .outerjoin(Report, Report.incident_id == Incident.id)
+        .group_by(Incident.id)
+        .order_by(Incident.created_at.desc())
+    )
+
+    rows = db.execute(statement).all()
+
+    return [
+        {
+            "incident_id": incident.id,
+            "incident_type": incident.incident_type,
+            "location_name": incident.location_name,
+            "latitude": incident.latitude,
+            "longitude": incident.longitude,
+            "severity": incident.severity,
+            "needs": incident.needs,
+            "status": incident.status,
+            "verification_status": incident.verification_status,
+            "report_count": report_count,
+            "created_at": utc_timestamp(incident.created_at),
+            "updated_at": utc_timestamp(incident.updated_at),
+        }
+        for incident, report_count in rows
+    ]
+
+
+@app.get("/resources")
+def list_resources(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    resource_type: Optional[str] = None,
+    availability: Optional[
+        Literal["AVAILABLE", "BUSY", "OFFLINE"]
+    ] = None,
+    db: Session = Depends(get_db),
+):
+    filters = []
+
+    if resource_type:
+        filters.append(Resource.resource_type == resource_type)
+
+    if availability:
+        filters.append(Resource.availability == availability)
+
+    total = db.scalar(
+        select(func.count())
+        .select_from(Resource)
+        .where(*filters)
+    )
+
+    resources = db.scalars(
+        select(Resource)
+        .where(*filters)
+        .order_by(Resource.id)
+        .offset(offset)
+        .limit(limit)
+    ).all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "items": [
+            {
+                "resource_id": resource.id,
+                "name": resource.name,
+                "resource_type": resource.resource_type,
+                "department": resource.department,
+                "capabilities": resource.capabilities,
+                "location_name": resource.location_name,
+                "latitude": resource.latitude,
+                "longitude": resource.longitude,
+                "availability": resource.availability,
+            }
+            for resource in resources
+        ],
+    }
+
+@app.get("/incidents/{incident_id}/resources")
+def incident_resources(
+    incident_id: str,
+    radius_km: float = Query(default=25.0, gt=0, le=100),
+    per_need: int = Query(default=3, ge=1, le=10),
+    db: Session = Depends(get_db),
+):
+    incident = db.get(Incident, incident_id)
+
+    if incident is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found.",
+        )
+
+    return recommend_resources(
+        db=db,
+        incident=incident,
+        radius_km=radius_km,
+        per_need=per_need,
+    )
+
+
+def utc_timestamp(value):
+    if value is None:
+        return None
+
+    # Our SQLite timestamps were written using UTC.
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+
+    return value.astimezone(timezone.utc).isoformat()
+
+
+@app.get("/incidents/{incident_id}")
+def incident_details(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    incident = db.get(Incident, incident_id)
+
+    if incident is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found.",
+        )
+
+    reports = db.scalars(
+        select(Report)
+        .where(Report.incident_id == incident_id)
+        .order_by(Report.received_at, Report.id)
+    ).all()
+
+    return {
+        "incident_id": incident.id,
+        "incident_type": incident.incident_type,
+        "location_name": incident.location_name,
+        "latitude": incident.latitude,
+        "longitude": incident.longitude,
+        "severity": incident.severity,
+        "needs": incident.needs,
+        "status": incident.status,
+        "verification_status": incident.verification_status,
+        "created_at": utc_timestamp(incident.created_at),
+        "updated_at": utc_timestamp(incident.updated_at),
+        "report_count": len(reports),
+        "reports": [
+            {
+                "report_id": report.id,
+                "original_text": report.original_text,
+                "crisis_analysis": report.crisis_analysis,
+                "currentness": report.currentness_assessment,
+                "received_at": utc_timestamp(report.received_at),
+            }
+            for report in reports
+        ],
+    }
+
+class IncidentStatusUpdate(BaseModel):
+    status: Literal["OPEN", "IN_PROGRESS", "RESOLVED"]
+
+
+@app.patch("/incidents/{incident_id}/status")
+def update_incident_status(
+    incident_id: str,
+    request: IncidentStatusUpdate,
+    db: Session = Depends(get_db),
+):
+    incident = db.get(Incident, incident_id)
+
+    if incident is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found.",
+        )
+
+    if (
+        request.status == "IN_PROGRESS"
+        and incident.verification_status != "VERIFIED"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Human verification is required before response begins.",
+        )
+
+    if incident.status != request.status:
+        try:
+            incident.status = request.status
+            incident.updated_at = utc_now()
+            db.commit()
+            db.refresh(incident)
+        except Exception:
+            db.rollback()
+            raise
+
+    return {
+        "incident_id": incident.id,
+        "status": incident.status,
+        "verification_status": incident.verification_status,
+        "updated_at": utc_timestamp(incident.updated_at),
     }

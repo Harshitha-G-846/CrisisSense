@@ -1,0 +1,153 @@
+anchor_id,state_or_ut,state_code,region_kind,city_or_locality,district,latitude,longitude,settlement_type,hazard_tags,jitter_km,scenario_tag,coordinate_source,resource_count
+AP-VISAKHAPAT,Andhra Pradesh,AP,state,Visakhapatnam,Visakhapatnam,17.69,83.22,metropolitan,coastal,6.0,baseline,approximate_manual_entry_unverified,21
+AP-VIJAYAWADA,Andhra Pradesh,AP,state,Vijayawada,,16.51,80.65,metropolitan,flood_prone,6.0,baseline,approximate_manual_entry_unverified,81
+AP-TIRUPATI,Andhra Pradesh,AP,state,Tirupati,Tirupati,13.63,79.42,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,12
+AP-KURNOOL,Andhra Pradesh,AP,state,Kurnool,Kurnool,15.83,78.04,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,85
+AP-ARAKUVALLE,Andhra Pradesh,AP,state,Araku Valley,,18.33,82.88,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,12
+AR-ITANAGAR,Arunachal Pradesh,AR,state,Itanagar,Papum Pare,27.08,93.61,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,18
+AR-TAWANG,Arunachal Pradesh,AR,state,Tawang,Tawang,27.59,91.86,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,56
+AR-PASIGHAT,Arunachal Pradesh,AR,state,Pasighat,East Siang,28.07,95.33,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,46
+AR-ZIRO,Arunachal Pradesh,AR,state,Ziro,Lower Subansiri,27.55,93.83,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,7
+AS-GUWAHATI,Assam,AS,state,Guwahati,Kamrup Metropolitan,26.14,91.74,metropolitan,flood_prone,6.0,overloaded_area,approximate_manual_entry_unverified,64
+AS-DIBRUGARH,Assam,AS,state,Dibrugarh,Dibrugarh,27.48,94.91,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,63
+AS-SILCHAR,Assam,AS,state,Silchar,Cachar,24.83,92.78,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,12
+AS-JORHAT,Assam,AS,state,Jorhat,Jorhat,26.75,94.2,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,25
+AS-MAJULI,Assam,AS,state,Majuli,Majuli,26.95,94.17,rural,flood_prone,8.0,scarce_area,approximate_manual_entry_unverified,4
+BR-PATNA,Bihar,BR,state,Patna,Patna,25.59,85.14,metropolitan,flood_prone,6.0,baseline,approximate_manual_entry_unverified,32
+BR-GAYA,Bihar,BR,state,Gaya,Gaya,24.8,85.0,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,28
+BR-BHAGALPUR,Bihar,BR,state,Bhagalpur,Bhagalpur,25.24,86.97,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,27
+BR-DARBHANGA,Bihar,BR,state,Darbhanga,Darbhanga,26.15,85.9,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,44
+BR-SUPAUL,Bihar,BR,state,Supaul,Supaul,26.12,86.6,rural,flood_prone,8.0,scarce_area,approximate_manual_entry_unverified,3
+CG-RAIPUR,Chhattisgarh,CG,state,Raipur,Raipur,21.25,81.63,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,78
+CG-BILASPUR,Chhattisgarh,CG,state,Bilaspur,Bilaspur,22.08,82.15,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,24
+CG-JAGDALPUR,Chhattisgarh,CG,state,Jagdalpur,Bastar,19.07,82.03,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,45
+CG-KONDAGAON,Chhattisgarh,CG,state,Kondagaon,Kondagaon,19.59,81.66,rural,,8.0,scarce_area,approximate_manual_entry_unverified,4
+GA-PANAJI,Goa,GA,state,Panaji,North Goa,15.5,73.83,smaller_town,coastal,3.0,baseline,approximate_manual_entry_unverified,27
+GA-MARGAO,Goa,GA,state,Margao,South Goa,15.27,73.96,smaller_town,coastal,3.0,baseline,approximate_manual_entry_unverified,29
+GA-CANACONA,Goa,GA,state,Canacona,South Goa,15.01,74.05,rural,coastal,3.0,baseline,approximate_manual_entry_unverified,9
+GJ-AHMEDABAD,Gujarat,GJ,state,Ahmedabad,Ahmedabad,23.02,72.57,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,149
+GJ-SURAT,Gujarat,GJ,state,Surat,Surat,21.17,72.83,metropolitan,flood_prone;coastal,6.0,baseline,approximate_manual_entry_unverified,26
+GJ-RAJKOT,Gujarat,GJ,state,Rajkot,Rajkot,22.3,70.8,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,26
+GJ-BHUJ,Gujarat,GJ,state,Bhuj,Kutch,23.25,69.67,smaller_town,arid,4.0,baseline,approximate_manual_entry_unverified,47
+GJ-AHWA,Gujarat,GJ,state,Ahwa,The Dangs,20.76,73.69,rural,hill,8.0,baseline,approximate_manual_entry_unverified,11
+HR-GURUGRAM,Haryana,HR,state,Gurugram,Gurugram,28.46,77.03,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,40
+HR-FARIDABAD,Haryana,HR,state,Faridabad,Faridabad,28.41,77.31,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,28
+HR-HISAR,Haryana,HR,state,Hisar,Hisar,29.15,75.72,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,20
+HR-NUH,Haryana,HR,state,Nuh,Nuh,28.11,77.0,rural,,8.0,baseline,approximate_manual_entry_unverified,18
+HP-SHIMLA,Himachal Pradesh,HP,state,Shimla,Shimla,31.1,77.17,smaller_town,hill,3.0,baseline,approximate_manual_entry_unverified,27
+HP-DHARAMSHAL,Himachal Pradesh,HP,state,Dharamshala,Kangra,32.22,76.32,smaller_town,hill,3.0,baseline,approximate_manual_entry_unverified,29
+HP-MANALI,Himachal Pradesh,HP,state,Manali,Kullu,32.24,77.19,smaller_town,hill,3.0,baseline,approximate_manual_entry_unverified,32
+HP-KAZA,Himachal Pradesh,HP,state,Kaza,Lahaul and Spiti,32.23,78.07,rural,hill,8.0,zero_resource_area,approximate_manual_entry_unverified,0
+JH-RANCHI,Jharkhand,JH,state,Ranchi,Ranchi,23.34,85.31,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,68
+JH-JAMSHEDPUR,Jharkhand,JH,state,Jamshedpur,East Singhbhum,22.8,86.2,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,34
+JH-DHANBAD,Jharkhand,JH,state,Dhanbad,Dhanbad,23.8,86.43,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,41
+JH-DUMKA,Jharkhand,JH,state,Dumka,Dumka,24.27,87.25,rural,,8.0,baseline,approximate_manual_entry_unverified,14
+KA-WHITEFIELD,Karnataka,KA,state,Whitefield,Bengaluru Urban,12.9698,77.75,metropolitan,flood_prone,6.0,test_guarantee,approximate_manual_entry_unverified,86
+KA-JAYANAGAR,Karnataka,KA,state,Jayanagar,Bengaluru Urban,12.925,77.5938,metropolitan,,5.0,test_guarantee,approximate_manual_entry_unverified,48
+KA-MYSURU,Karnataka,KA,state,Mysuru,Mysuru,12.3,76.64,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,32
+KA-MANGALURU,Karnataka,KA,state,Mangaluru,Dakshina Kannada,12.91,74.86,smaller_town,coastal,4.0,baseline,approximate_manual_entry_unverified,29
+KA-HUBBALLI,Karnataka,KA,state,Hubballi,Dharwad,15.36,75.12,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,72
+KA-MADIKERI,Karnataka,KA,state,Madikeri,Kodagu,12.42,75.74,rural,hill,8.0,baseline,approximate_manual_entry_unverified,6
+KA-RAICHUR,Karnataka,KA,state,Raichur,Raichur,16.21,77.36,rural,,8.0,baseline,approximate_manual_entry_unverified,11
+KL-THIRUVANAN,Kerala,KL,state,Thiruvananthapuram,Thiruvananthapuram,8.52,76.94,metropolitan,coastal,6.0,baseline,approximate_manual_entry_unverified,38
+KL-KOCHI,Kerala,KL,state,Kochi,Ernakulam,9.93,76.27,metropolitan,coastal;flood_prone,6.0,baseline,approximate_manual_entry_unverified,36
+KL-KOZHIKODE,Kerala,KL,state,Kozhikode,Kozhikode,11.26,75.78,smaller_town,coastal,4.0,baseline,approximate_manual_entry_unverified,31
+KL-KALPETTA,Kerala,KL,state,Kalpetta,Wayanad,11.61,76.08,rural,hill,8.0,baseline,approximate_manual_entry_unverified,7
+KL-ALAPPUZHA,Kerala,KL,state,Alappuzha,Alappuzha,9.49,76.34,rural,flood_prone;coastal,8.0,overloaded_area,approximate_manual_entry_unverified,14
+MP-BHOPAL,Madhya Pradesh,MP,state,Bhopal,Bhopal,23.26,77.41,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,22
+MP-INDORE,Madhya Pradesh,MP,state,Indore,Indore,22.72,75.86,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,48
+MP-JABALPUR,Madhya Pradesh,MP,state,Jabalpur,Jabalpur,23.18,79.94,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,19
+MP-GWALIOR,Madhya Pradesh,MP,state,Gwalior,Gwalior,26.22,78.18,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,9
+MP-MANDLA,Madhya Pradesh,MP,state,Mandla,Mandla,22.6,80.37,rural,,8.0,baseline,approximate_manual_entry_unverified,20
+MH-MUMBAI,Maharashtra,MH,state,Mumbai,,19.08,72.88,metropolitan,coastal;flood_prone,4.0,overloaded_area,approximate_manual_entry_unverified,57
+MH-PUNE,Maharashtra,MH,state,Pune,Pune,18.52,73.86,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,80
+MH-NAGPUR,Maharashtra,MH,state,Nagpur,Nagpur,21.15,79.09,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,41
+MH-NASHIK,Maharashtra,MH,state,Nashik,Nashik,19.99,73.79,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,6
+MH-KOLHAPUR,Maharashtra,MH,state,Kolhapur,Kolhapur,16.7,74.24,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,35
+MH-GADCHIROLI,Maharashtra,MH,state,Gadchiroli,Gadchiroli,20.18,80.0,rural,flood_prone,8.0,scarce_area,approximate_manual_entry_unverified,3
+MN-IMPHAL,Manipur,MN,state,Imphal,Imphal West,24.82,93.95,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,11
+MN-CHURACHAND,Manipur,MN,state,Churachandpur,Churachandpur,24.33,93.68,rural,hill,8.0,baseline,approximate_manual_entry_unverified,14
+MN-UKHRUL,Manipur,MN,state,Ukhrul,Ukhrul,25.12,94.36,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,3
+ML-SHILLONG,Meghalaya,ML,state,Shillong,East Khasi Hills,25.57,91.88,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,23
+ML-TURA,Meghalaya,ML,state,Tura,West Garo Hills,25.51,90.22,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,45
+ML-SOHRA,Meghalaya,ML,state,Sohra,East Khasi Hills,25.27,91.73,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,3
+MZ-AIZAWL,Mizoram,MZ,state,Aizawl,Aizawl,23.73,92.72,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,16
+MZ-LUNGLEI,Mizoram,MZ,state,Lunglei,Lunglei,22.89,92.73,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,70
+MZ-CHAMPHAI,Mizoram,MZ,state,Champhai,Champhai,23.46,93.33,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,3
+NL-KOHIMA,Nagaland,NL,state,Kohima,Kohima,25.67,94.11,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,40
+NL-DIMAPUR,Nagaland,NL,state,Dimapur,Dimapur,25.91,93.73,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,35
+NL-MON,Nagaland,NL,state,Mon,Mon,26.73,95.03,rural,hill,8.0,zero_resource_area,approximate_manual_entry_unverified,0
+OD-BHUBANESWA,Odisha,OD,state,Bhubaneswar,Khordha,20.3,85.82,metropolitan,coastal,6.0,baseline,approximate_manual_entry_unverified,54
+OD-CUTTACK,Odisha,OD,state,Cuttack,Cuttack,20.46,85.88,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,36
+OD-PURI,Odisha,OD,state,Puri,Puri,19.81,85.83,smaller_town,coastal,4.0,baseline,approximate_manual_entry_unverified,22
+OD-KENDRAPARA,Odisha,OD,state,Kendrapara,Kendrapara,20.5,86.42,rural,flood_prone;coastal,8.0,overloaded_area,approximate_manual_entry_unverified,34
+OD-KORAPUT,Odisha,OD,state,Koraput,Koraput,18.81,82.71,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,3
+PB-LUDHIANA,Punjab,PB,state,Ludhiana,Ludhiana,30.9,75.86,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,45
+PB-AMRITSAR,Punjab,PB,state,Amritsar,Amritsar,31.63,74.87,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,55
+PB-PATIALA,Punjab,PB,state,Patiala,Patiala,30.34,76.39,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,17
+PB-FAZILKA,Punjab,PB,state,Fazilka,Fazilka,30.4,74.03,rural,flood_prone,8.0,baseline,approximate_manual_entry_unverified,15
+RJ-JAIPUR,Rajasthan,RJ,state,Jaipur,Jaipur,26.91,75.79,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,108
+RJ-JODHPUR,Rajasthan,RJ,state,Jodhpur,Jodhpur,26.24,73.02,smaller_town,arid,4.0,baseline,approximate_manual_entry_unverified,21
+RJ-UDAIPUR,Rajasthan,RJ,state,Udaipur,Udaipur,24.59,73.71,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,21
+RJ-JAISALMER,Rajasthan,RJ,state,Jaisalmer,Jaisalmer,26.92,70.91,rural,arid,8.0,baseline,approximate_manual_entry_unverified,15
+RJ-BARMER,Rajasthan,RJ,state,Barmer,Barmer,25.75,71.39,rural,arid,8.0,scarce_area,approximate_manual_entry_unverified,4
+SK-GANGTOK,Sikkim,SK,state,Gangtok,,27.33,88.61,smaller_town,hill,3.0,baseline,approximate_manual_entry_unverified,20
+SK-NAMCHI,Sikkim,SK,state,Namchi,,27.17,88.36,smaller_town,hill,3.0,baseline,approximate_manual_entry_unverified,23
+SK-LACHUNG,Sikkim,SK,state,Lachung,,27.69,88.74,rural,hill,3.0,zero_resource_area,approximate_manual_entry_unverified,0
+TN-CHENNAI,Tamil Nadu,TN,state,Chennai,Chennai,13.08,80.27,metropolitan,coastal;flood_prone,6.0,baseline,approximate_manual_entry_unverified,75
+TN-COIMBATORE,Tamil Nadu,TN,state,Coimbatore,Coimbatore,11.02,76.96,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,72
+TN-MADURAI,Tamil Nadu,TN,state,Madurai,Madurai,9.92,78.12,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,40
+TN-TIRUCHIRAP,Tamil Nadu,TN,state,Tiruchirappalli,Tiruchirappalli,10.79,78.7,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,15
+TN-NAGAPATTIN,Tamil Nadu,TN,state,Nagapattinam,Nagapattinam,10.77,79.84,rural,coastal;flood_prone,8.0,baseline,approximate_manual_entry_unverified,10
+TN-COONOOR,Tamil Nadu,TN,state,Coonoor,The Nilgiris,11.35,76.8,rural,hill,8.0,baseline,approximate_manual_entry_unverified,12
+TS-HYDERABAD,Telangana,TS,state,Hyderabad,Hyderabad,17.39,78.49,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,76
+TS-WARANGAL,Telangana,TS,state,Warangal,Warangal,17.97,79.59,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,29
+TS-NIZAMABAD,Telangana,TS,state,Nizamabad,Nizamabad,18.67,78.09,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,20
+TS-BHADRACHAL,Telangana,TS,state,Bhadrachalam,Bhadradri Kothagudem,17.67,80.89,rural,flood_prone,8.0,baseline,approximate_manual_entry_unverified,7
+TR-AGARTALA,Tripura,TR,state,Agartala,West Tripura,23.83,91.28,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,12
+TR-UDAIPUR,Tripura,TR,state,Udaipur,Gomati,23.53,91.49,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,41
+TR-DHARMANAGA,Tripura,TR,state,Dharmanagar,North Tripura,24.37,92.17,rural,,8.0,baseline,approximate_manual_entry_unverified,16
+UP-LUCKNOW,Uttar Pradesh,UP,state,Lucknow,Lucknow,26.85,80.95,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,63
+UP-KANPUR,Uttar Pradesh,UP,state,Kanpur,Kanpur Nagar,26.45,80.35,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,72
+UP-VARANASI,Uttar Pradesh,UP,state,Varanasi,Varanasi,25.32,82.97,metropolitan,flood_prone,6.0,baseline,approximate_manual_entry_unverified,160
+UP-PRAYAGRAJ,Uttar Pradesh,UP,state,Prayagraj,Prayagraj,25.44,81.85,metropolitan,flood_prone,6.0,baseline,approximate_manual_entry_unverified,76
+UP-NOIDA,Uttar Pradesh,UP,state,Noida,Gautam Buddh Nagar,28.54,77.39,metropolitan,,6.0,baseline,approximate_manual_entry_unverified,29
+UP-GORAKHPUR,Uttar Pradesh,UP,state,Gorakhpur,Gorakhpur,26.76,83.37,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,49
+UP-BAHRAICH,Uttar Pradesh,UP,state,Bahraich,Bahraich,27.57,81.6,rural,flood_prone,8.0,baseline,approximate_manual_entry_unverified,10
+UP-LAKHIMPURK,Uttar Pradesh,UP,state,Lakhimpur Kheri,Lakhimpur Kheri,27.95,80.78,rural,flood_prone,8.0,baseline,approximate_manual_entry_unverified,8
+UK-DEHRADUN,Uttarakhand,UK,state,Dehradun,Dehradun,30.32,78.03,smaller_town,hill,4.0,baseline,approximate_manual_entry_unverified,15
+UK-HARIDWAR,Uttarakhand,UK,state,Haridwar,Haridwar,29.95,78.16,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,25
+UK-PITHORAGAR,Uttarakhand,UK,state,Pithoragarh,Pithoragarh,29.58,80.21,rural,hill,8.0,baseline,approximate_manual_entry_unverified,15
+UK-UTTARKASHI,Uttarakhand,UK,state,Uttarkashi,Uttarkashi,30.73,78.44,rural,hill,8.0,baseline,approximate_manual_entry_unverified,6
+UK-JOSHIMATH,Uttarakhand,UK,state,Joshimath,Chamoli,30.56,79.56,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,3
+WB-KOLKATA,West Bengal,WB,state,Kolkata,Kolkata,22.57,88.36,metropolitan,flood_prone,6.0,baseline,approximate_manual_entry_unverified,178
+WB-SILIGURI,West Bengal,WB,state,Siliguri,Darjeeling,26.73,88.4,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,38
+WB-ASANSOL,West Bengal,WB,state,Asansol,Paschim Bardhaman,23.68,86.98,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,11
+WB-MALDA,West Bengal,WB,state,Malda,Malda,25.01,88.14,smaller_town,flood_prone,4.0,baseline,approximate_manual_entry_unverified,16
+WB-GOSABA,West Bengal,WB,state,Gosaba,South 24 Parganas,22.17,88.8,rural,coastal;flood_prone,8.0,scarce_area,approximate_manual_entry_unverified,3
+AN-PORTBLAIR,Andaman and Nicobar Islands,AN,union_territory,Port Blair,South Andaman,11.62,92.73,smaller_town,coastal;island,3.0,baseline,approximate_manual_entry_unverified,14
+AN-DIGLIPUR,Andaman and Nicobar Islands,AN,union_territory,Diglipur,North and Middle Andaman,13.27,92.98,rural,coastal;island,3.0,scarce_area,approximate_manual_entry_unverified,3
+AN-CARNICOBAR,Andaman and Nicobar Islands,AN,union_territory,Car Nicobar,Nicobar,9.17,92.82,rural,coastal;island,2.0,zero_resource_area,approximate_manual_entry_unverified,0
+CH-CHANDIGARH,Chandigarh,CH,union_territory,Chandigarh Sector 17,Chandigarh,30.74,76.78,metropolitan,,3.0,baseline,approximate_manual_entry_unverified,43
+CH-MANIMAJRA,Chandigarh,CH,union_territory,Manimajra,Chandigarh,30.72,76.84,smaller_town,,3.0,baseline,approximate_manual_entry_unverified,31
+DH-SILVASSA,Dadra and Nagar Haveli and Daman and Diu,DH,union_territory,Silvassa,Dadra and Nagar Haveli,20.27,73.01,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,76
+DH-DAMAN,Dadra and Nagar Haveli and Daman and Diu,DH,union_territory,Daman,Daman,20.4,72.83,smaller_town,coastal,2.0,baseline,approximate_manual_entry_unverified,32
+DH-DIU,Dadra and Nagar Haveli and Daman and Diu,DH,union_territory,Diu,Diu,20.71,70.99,rural,coastal;island,2.0,baseline,approximate_manual_entry_unverified,15
+DL-CONNAUGHTP,Delhi,DL,union_territory,Connaught Place,New Delhi,28.63,77.22,metropolitan,,4.0,baseline,approximate_manual_entry_unverified,163
+DL-DWARKA,Delhi,DL,union_territory,Dwarka,South West Delhi,28.59,77.05,metropolitan,,4.0,baseline,approximate_manual_entry_unverified,33
+DL-ROHINI,Delhi,DL,union_territory,Rohini,North West Delhi,28.74,77.07,metropolitan,,4.0,baseline,approximate_manual_entry_unverified,122
+JK-SRINAGAR,Jammu and Kashmir,JK,union_territory,Srinagar,Srinagar,34.08,74.8,metropolitan,flood_prone;hill,6.0,baseline,approximate_manual_entry_unverified,62
+JK-JAMMU,Jammu and Kashmir,JK,union_territory,Jammu,Jammu,32.73,74.86,smaller_town,,4.0,baseline,approximate_manual_entry_unverified,61
+JK-ANANTNAG,Jammu and Kashmir,JK,union_territory,Anantnag,Anantnag,33.73,75.15,smaller_town,flood_prone;hill,4.0,baseline,approximate_manual_entry_unverified,35
+JK-KUPWARA,Jammu and Kashmir,JK,union_territory,Kupwara,Kupwara,34.52,74.26,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,3
+JK-DODA,Jammu and Kashmir,JK,union_territory,Doda,Doda,33.15,75.55,rural,hill,8.0,scarce_area,approximate_manual_entry_unverified,4
+LA-LEH,Ladakh,LA,union_territory,Leh,Leh,34.15,77.58,smaller_town,arid;hill,4.0,baseline,approximate_manual_entry_unverified,30
+LA-KARGIL,Ladakh,LA,union_territory,Kargil,Kargil,34.56,76.13,smaller_town,arid;hill,4.0,baseline,approximate_manual_entry_unverified,14
+LA-DISKIT,Ladakh,LA,union_territory,Diskit,Leh,34.55,77.56,rural,arid;hill,8.0,zero_resource_area,approximate_manual_entry_unverified,0
+LD-KAVARATTI,Lakshadweep,LD,union_territory,Kavaratti,Lakshadweep,10.57,72.64,smaller_town,coastal;island,0.8,baseline,approximate_manual_entry_unverified,12
+LD-AGATTI,Lakshadweep,LD,union_territory,Agatti,Lakshadweep,10.85,72.18,rural,coastal;island,1.0,baseline,approximate_manual_entry_unverified,13
+LD-MINICOY,Lakshadweep,LD,union_territory,Minicoy,Lakshadweep,8.28,73.05,rural,coastal;island,0.8,zero_resource_area,approximate_manual_entry_unverified,0
+PY-PUDUCHERRY,Puducherry,PY,union_territory,Puducherry,Puducherry,11.93,79.83,smaller_town,coastal,3.0,baseline,approximate_manual_entry_unverified,23
+PY-KARAIKAL,Puducherry,PY,union_territory,Karaikal,Karaikal,10.92,79.84,smaller_town,coastal,3.0,baseline,approximate_manual_entry_unverified,21
+PY-YANAM,Puducherry,PY,union_territory,Yanam,Yanam,16.73,82.22,rural,coastal;flood_prone,2.0,baseline,approximate_manual_entry_unverified,16
+PY-MAHE,Puducherry,PY,union_territory,Mahe,Mahe,11.7,75.54,rural,coastal,2.0,baseline,approximate_manual_entry_unverified,6
