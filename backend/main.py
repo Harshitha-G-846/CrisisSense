@@ -8,6 +8,7 @@ Member 1 (crisis analysis) + Member 2 (multimodal currentness verification)
 """
 from __future__ import annotations
 
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
@@ -35,7 +36,11 @@ from member1.pipeline import analyze_crisis
 from member2.currentness_agent import run_currentness_verification
 from member2.schemas import Member1Context
 
-
+from member4.authorization_service import authorize_response
+from member4.schemas import VerificationRequest, FeedbackRequest
+from member4.feedback_service import process_feedback
+from member4.replanning_service import generate_revised_plan
+from member4.verification_service import verify_incident
 # ---------------------------------------------------------------------------
 # Allowed media extensions
 # ---------------------------------------------------------------------------
@@ -122,6 +127,8 @@ def _format_currentness(result) -> dict:
 # Routes
 # ---------------------------------------------------------------------------
 
+
+
 @app.get("/")
 def home():
     return {"message": "CrisisSense API is running", "version": "2.0"}
@@ -132,6 +139,68 @@ def home():
 class CrisisRequest(BaseModel):
     text: str
 
+@app.post("/incidents/{incident_id}/feedback")
+def submit_feedback(
+    incident_id: str,
+    request: FeedbackRequest,
+    db: Session = Depends(get_db),
+):
+    result = process_feedback(
+        db=db,
+        incident_id=incident_id,
+        feedback=request.feedback,
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found"
+        )
+
+    return result
+
+
+@app.post("/incidents/{incident_id}/authorize")
+def authorize_incident_response(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    result = authorize_response(
+        db=db,
+        incident_id=incident_id,
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found",
+        )
+
+    if result.get("success") is False:
+        raise HTTPException(
+            status_code=400,
+            detail=result["message"],
+        )
+
+    return result
+
+@app.post("/incidents/{incident_id}/replan")
+def replan_incident(
+    incident_id: str,
+    db: Session = Depends(get_db),
+):
+    result = generate_revised_plan(
+        db=db,
+        incident_id=incident_id,
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found"
+        )
+
+    return result
 
 @app.post("/analyze-text")
 def analyze_text(
@@ -328,6 +397,27 @@ def list_incidents(db: Session = Depends(get_db)):
         }
         for incident, report_count in rows
     ]
+
+@app.post("/incidents/{incident_id}/verify")
+def verify_incident_endpoint(
+    incident_id: str,
+    request: VerificationRequest,
+    db: Session = Depends(get_db),
+):
+    result = verify_incident(
+        db=db,
+        incident_id=incident_id,
+        decision=request.decision,
+        reason=request.reason,
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found"
+        )
+
+    return result
 
 
 @app.get("/resources")

@@ -39,6 +39,12 @@ class Incident(Base):
         String, nullable=False, default="PENDING"
     )
     status = Column(String, nullable=False, default="OPEN", index=True)
+    response_status = Column(
+    String,
+    nullable=False,
+    default="NOT_PLANNED",
+    index=True,
+)
 
     created_at = Column(DateTime, nullable=False, default=utc_now)
     updated_at = Column(
