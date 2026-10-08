@@ -1,21 +1,28 @@
 import joblib
 from scipy.sparse import hstack
+from pathlib import Path
 
 from .severity import extract_severity
 from .needs_extractor import extract_needs
 from .location_extractor import extract_locations
 
+# ==================================================
+# Project Paths
+# ==================================================
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODEL_DIR = BASE_DIR / "models"
+print("Loading models from:", MODEL_DIR.resolve())
 # ==================================================
 # 1. Load Crisis Detection Model
 # ==================================================
 
 crisis_model = joblib.load(
-    "models/crisis_classifier.pkl"
+    MODEL_DIR / "crisis_classifier.pkl"
 )
 
 crisis_vectorizer = joblib.load(
-    "models/tfidf_vectorizer.pkl"
+    MODEL_DIR / "tfidf_vectorizer.pkl"
 )
 
 
@@ -24,15 +31,15 @@ crisis_vectorizer = joblib.load(
 # ==================================================
 
 info_model = joblib.load(
-    "models/information_type_classifier.pkl"
+    MODEL_DIR / "information_type_classifier.pkl"
 )
 
 word_vectorizer = joblib.load(
-    "models/information_type_word_vectorizer.pkl"
+    MODEL_DIR / "information_type_word_vectorizer.pkl"
 )
 
 char_vectorizer = joblib.load(
-    "models/information_type_char_vectorizer.pkl"
+    MODEL_DIR / "information_type_char_vectorizer.pkl"
 )
 
 
@@ -41,11 +48,11 @@ char_vectorizer = joblib.load(
 # ==================================================
 
 incident_model = joblib.load(
-    "models/incident_type_classifier.pkl"
+    MODEL_DIR / "incident_type_classifier.pkl"
 )
 
 incident_vectorizer = joblib.load(
-    "models/incident_type_vectorizer.pkl"
+    MODEL_DIR / "incident_type_vectorizer.pkl"
 )
 
 
