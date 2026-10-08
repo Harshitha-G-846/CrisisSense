@@ -18,3 +18,15 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Local SQLite databases and temporary database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Other Python compiled files
+*.pyd
+
+# Allow a placeholder configuration file without real secrets
+!.env.example

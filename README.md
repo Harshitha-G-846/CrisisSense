@@ -494,3 +494,159 @@ Input (Text, Image, Video, Audio, Context)
 - **CrisisMMD**: Used strictly for multimodal crisis understanding and multimodal text+image evaluation. CrisisMMD does **not** provide ground-truth temporal currentness labels and is not treated as a direct currentness dataset.
 - **CrisisLexT26**: Used as a local reference corpus for historical crisis event metadata and contextual alignment.
 - **Heuristic Fusion**: Decision boundaries, source reliability weights, and confidence values are deterministic heuristic baselines designed for safety; empirical calibration is conducted in Phase 11.
+
+
+# Member 3: Incident and Resource Management
+
+## Responsibilities
+
+- Store reports and preserve Member 1 and Member 2 outputs.
+- Consolidate related reports into incidents.
+- Update incident needs, severity, and timestamps.
+- Store synthetic response resources.
+- Recommend available nearby resources and response departments.
+- Provide incident, resource, and lifecycle APIs.
+
+## Setup on Windows
+
+Run these commands from the backend folder:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m member3.init_db
+.\.venv\Scripts\python.exe -m member3.import_resources
+.\.venv\Scripts\python.exe -m uvicorn main:app --port 8000
+```
+
+Place synthetic_resources.csv and anchors.csv in backend/data.
+
+The first model use may require downloads. OCR also requires the
+external Tesseract application; installing pytesseract alone does
+not install it.
+
+Swagger documentation: http://127.0.0.1:8000/docs
+
+init_db creates missing tables without deleting existing records.
+It does not migrate existing table columns.
+
+The resource importer inserts missing IDs and preserves existing
+records and availability on repeated runs.
+
+## APIs
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | /analyze-text | Analyze, save, and consolidate a text report |
+| POST | /analyze | Analyze optional media; save and consolidate when text is supplied |
+| GET | /incidents | List incidents and report counts |
+| GET | /incidents/{incident_id} | Read incident details and linked report evidence |
+| GET | /resources | Browse resources with pagination and filters |
+| GET | /incidents/{incident_id}/resources | Recommend resources and departments |
+| PATCH | /incidents/{incident_id}/status | Update lifecycle status |
+
+Resource browsing parameters:
+limit (1–100), offset, resource_type, availability.
+
+Recommendation parameters:
+radius_km (greater than 0, up to 100), per_need (1–10).
+
+## Consolidation rules
+
+Candidates must be OPEN or IN_PROGRESS and not REJECTED.
+They must have the same incident type, matching location names,
+and coordinates within 1 km.
+
+Candidate reports must have been received during the preceding
+24 hours. This uses receipt time, not verified event time.
+
+A unique exact-text match is preferred. Otherwise, a unique
+incident with a report similarity score of at least 0.80 is used.
+
+The distance, time, and similarity settings are provisional.
+They have not been validated as operational thresholds.
+
+Non-crisis and OLD reports remain saved without an incident.
+Multiple possible matches currently lead to a new PENDING
+incident; there is no dedicated ambiguity-review workflow yet.
+
+Newly linked reports combine needs, retain the highest reported
+severity, and update the timestamp.
+
+## Resource recommendations
+
+Recommendations use capabilities, availability, straight-line
+distance, and initial resource-type suitability rules.
+
+The default radius is 25 km. Only AVAILABLE resources qualify.
+Unfulfilled needs appear in unmet_needs.
+
+For fire incidents:
+- Fire suppression requires a fire unit.
+- Rescue candidates are fire units or rescue teams.
+- Medical candidates are ambulances or medical teams.
+
+Candidate lists do not allocate or reserve resources. One resource
+can appear under multiple needs. Recommendations require human
+approval and do not trigger dispatch.
+
+Departments are prototype categories, not verified local offices.
+
+## Member 4 integration
+
+Lifecycle values: OPEN, IN_PROGRESS, RESOLVED.
+
+Verification values expected by this module:
+PENDING, VERIFIED, REJECTED.
+
+IN_PROGRESS requires verification_status to be VERIFIED.
+Member 4 must implement the authorized human-verification
+workflow and agree on these values before integration.
+
+Status updates currently have no authentication, authorization,
+or audit history. They are intended for local prototype testing.
+
+Incident-detail timestamps explicitly include the UTC offset.
+The frontend can convert them to IST for display.
+
+## Dataset
+
+synthetic_resources.csv contains 5,006 fictional resources.
+anchors.csv provides supporting geographic metadata.
+
+Resource availability is simulated. Coordinates are illustrative
+and unverified. Regional coverage does not establish exhaustive
+coverage or nationwide operational effectiveness.
+
+The current importer stores only fields supported by Resource.
+Additional state, capacity, and provenance fields remain in CSV.
+
+## Known limitations
+
+- Media-only submissions are analyzed but not stored.
+- Original uploaded media is deleted after processing.
+- Unassigned reports have no dedicated review-list API.
+- Locality coordinates may represent multiple separate events.
+- Similarity thresholds need labelled evaluation.
+- Incident updates do not invalidate earlier human verification.
+- Resource suitability rules are incomplete for other scenarios.
+- Recommendations do not consider road travel time or capacity.
+- Incident lists and linked-report responses are not paginated.
+- Concurrent submissions may create duplicate incidents.
+
+## Checks
+
+```powershell
+.\.venv\Scripts\python.exe -m member3.test_location_matching
+.\.venv\Scripts\python.exe -m member3.test_incident_update
+.\.venv\Scripts\python.exe -m member3.test_similarity
+```
+
+The similarity script prints example scores; it is not a benchmark.
+test_save_report writes a sample report into the configured database.
+
+Manual API checks covered repeated and reworded reports, separate
+locations, resource filtering, shortages, lifecycle restrictions,
+incident details, and a text-and-image submission.
+These checks establish prototype behavior for the tested cases,
+not real-world accuracy or publication readiness.
