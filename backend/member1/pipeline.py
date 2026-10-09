@@ -25,6 +25,10 @@ crisis_vectorizer = joblib.load(
     MODEL_DIR / "tfidf_vectorizer.pkl"
 )
 
+crisis_char_vectorizer = joblib.load(
+    MODEL_DIR / "crisis_char_vectorizer.pkl"
+)
+
 
 # ==================================================
 # 2. Load Information Type Model
@@ -68,21 +72,106 @@ def clean_text(text):
 # 5. Crisis Detection
 # ==================================================
 
-def predict_crisis(text):
 
-    cleaned = clean_text(text)
+def is_clearly_benign_weather(text):
+    cleaned = " ".join(text.lower().split())
 
-    vector = crisis_vectorizer.transform(
-        [cleaned]
+    positive_weather_phrases = [
+        # General pleasant weather
+        "sunny",
+        "like",
+        "lovely",
+        "love",
+        "sunshine",
+        "clear sky",
+        "clear skies",
+        "blue sky",
+        "blue skies",
+        "nice weather",
+        "good weather",
+        "pleasant weather",
+        "beautiful weather",
+        "fair weather",
+        "mild weather",
+        "calm weather",
+        "normal weather",
+        "lovely weather",
+        "warm weather",
+        "cool weather",
+        "fresh air",
+        "gentle breeze",
+        "cool breeze",
+        "light breeze",
+        "partly cloudy",
+        "mostly sunny",
+        "cloudless sky",
+        "warm sunshine",
+        "light drizzle",
+        "comfortable temperature",
+
+        # Positive everyday expressions
+        "beautiful day",
+        "lovely day",
+        "pleasant day",
+        "peaceful day",
+        "nice day",
+        "good day",
+        "great day",
+        "feeling good",
+        "doing well",
+        "all good",
+        "no problem",
+        "everything fine",
+    ]
+
+    hazard_terms = [
+        "flood", "flooding", "flash flood", "disaster",
+        "emergency", "injured", "injuries", "trapped",
+        "evacuate", "evacuation", "damage", "destroyed",
+        "warning", "dangerous", "landslide", "cyclone",
+        "storm", "wildfire", "casualties", "rescue",
+        "heavy rainfall", "overflow", "collapsed",
+        "collapse", "earthquake", "tsunami", "explosion",
+        "fire", "drowning", "missing people", "stranded",
+        "power outage", "building damage", "road blocked",
+        "medical assistance", "need help", "urgent help",
+        "people trapped", "homes destroyed"
+    ]
+
+    has_positive_phrase = any(
+        phrase in cleaned
+        for phrase in positive_weather_phrases
     )
 
-    prediction = crisis_model.predict(
-        vector
-    )[0]
+    has_hazard_term = any(
+        term in cleaned
+        for term in hazard_terms
+    )
 
-    return True if prediction == 1 else False
+    return has_positive_phrase and not has_hazard_term
 
 
+def predict_crisis(text):
+    cleaned = clean_text(text)
+
+    word_features = crisis_vectorizer.transform([cleaned])
+    char_features = crisis_char_vectorizer.transform([cleaned])
+
+    features = hstack(
+        [word_features, char_features],
+        format="csr"
+    )
+
+    prediction = crisis_model.predict(features)[0]
+
+    print("Raw crisis prediction:", prediction)
+
+    if hasattr(crisis_model, "predict_proba"):
+        probabilities = crisis_model.predict_proba(features)[0]
+        print("Class labels:", crisis_model.classes_)
+        print("Class probabilities:", probabilities)
+
+    return bool(prediction == 1)
 # ==================================================
 # 6. Information Type Prediction
 # ==================================================
@@ -136,12 +225,32 @@ def predict_incident_type(text):
 
 def analyze_crisis(text):
 
+    # Handle clearly positive, harmless weather statements.
+    if is_clearly_benign_weather(text):
+        return {
+            "is_crisis": False,
+            "incident_type": None,
+            "information_type": None,
+            "severity": None,
+            "needs": [],
+            "locations": []
+        }
+
     is_crisis = predict_crisis(text)
 
+    # Stop if the model identifies it as non-crisis.
+    if not is_crisis:
+        return {
+            "is_crisis": False,
+            "incident_type": None,
+            "information_type": None,
+            "severity": None,
+            "needs": [],
+            "locations": []
+        }
+
     incident_type = predict_incident_type(text)
-
     information_type = predict_information_type(text)
-
     severity = extract_severity(text)
 
     needs = extract_needs(
@@ -151,22 +260,14 @@ def analyze_crisis(text):
 
     locations = extract_locations(text)
 
-    result = {
-
-        "is_crisis": is_crisis,
-
+    return {
+        "is_crisis": True,
         "incident_type": incident_type,
-
         "information_type": information_type,
-
         "severity": severity,
-
         "needs": needs,
-
         "locations": locations
     }
-
-    return result
 
 
 # ==================================================
