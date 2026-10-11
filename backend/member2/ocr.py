@@ -9,6 +9,7 @@ import pytesseract
 from .schemas import EvidenceItem, EvidencePolarity, EvidenceSource
 from .temporal import extract_temporal_evidence
 
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 def is_tesseract_available() -> bool:
     """Checks whether the system tesseract binary is installed and executable."""

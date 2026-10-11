@@ -303,13 +303,53 @@ async def analyze(
             audio_path = _save_upload(audio, suffix=_ext(audio.filename))
             temp_paths.append(audio_path)
 
-        # Member 1: text-based crisis analysis.
-        # Guard: analyze_crisis requires non-empty text (Member 1's zero-shot
-        # severity model raises ValueError on empty sequences).
+        # ── Step 1: collect raw text from every modality ─────────────────
+        # Start with the form-provided text (if any).
+        combined_text_parts: list[str] = []
         if text and text.strip():
-            m1_result = analyze_crisis(text.strip())
+            combined_text_parts.append(text.strip())
+
+        # Extract text from the image via OCR (best-effort).
+        if image_path:
+            try:
+                from member2.ocr import extract_ocr_text
+                ocr_text = extract_ocr_text(image_path)
+                if ocr_text and ocr_text.strip():
+                    combined_text_parts.append(ocr_text.strip())
+            except Exception as exc:
+                # Never let a media-extraction failure crash the request.
+                print(f"[analyze] OCR extraction failed: {exc}")
+
+        # Extract transcript from the audio via ASR (best-effort).
+        if audio_path:
+            try:
+                from member2.audio import transcribe_audio
+                asr = transcribe_audio(audio_path)
+                if getattr(asr, "succeeded", False) and asr.full_text.strip():
+                    combined_text_parts.append(asr.full_text.strip())
+            except Exception as exc:
+                print(f"[analyze] Audio transcription failed: {exc}")
+
+        # Extract text from sampled video frames via OCR (best-effort).
+        if video_path:
+            try:
+                from member2.video import sample_video_frames
+                from member2.ocr import extract_ocr_text
+                frames = sample_video_frames(video_path, max_frames=3)
+                for frame in frames:
+                    frame_ocr = extract_ocr_text(frame["image"])
+                    if frame_ocr and frame_ocr.strip():
+                        combined_text_parts.append(frame_ocr.strip())
+            except Exception as exc:
+                print(f"[analyze] Video OCR extraction failed: {exc}")
+
+        combined_text = " ".join(combined_text_parts).strip()
+
+        # ── Step 2: Member 1 classifies the combined text ────────────────
+        # If we have no text from any modality, Member 1 cannot run.
+        if combined_text:
+            m1_result = analyze_crisis(combined_text)
         else:
-            # No text supplied — Member 1 cannot classify without text.
             m1_result = {
                 "is_crisis": None,
                 "incident_type": None,
@@ -317,12 +357,19 @@ async def analyze(
                 "severity": None,
                 "needs": [],
                 "locations": [],
+                "crisis_probability": None,
+                "message": (
+                    "No text could be extracted from any modality. "
+                    "Crisis analysis is unavailable for this submission."
+                ),
             }
         m1_context = _build_member1_context(m1_result)
 
-        # Member 2: multimodal currentness verification
+        # ── Step 3: Member 2 currentness verification ────────────────────
+        # Pass the combined text so temporal claims from OCR/ASR are also
+        # considered alongside the form text.
         currentness_result = run_currentness_verification(
-            text=text or None,
+            text=combined_text or None,
             image_path=image_path,
             video_path=video_path,
             audio_path=audio_path,
@@ -342,12 +389,14 @@ async def analyze(
 
     report_id = None
     incident_id = None
-    storage_status = "NOT_SAVED_MEDIA_ONLY"
+    storage_status = "NOT_SAVED_NO_TEXT"
 
-    if text and text.strip():
+    # Persist any submission that produced usable text —
+    # whether from a form field, OCR, ASR, or a combination.
+    if combined_text:
         report = save_report(
             db=db,
-            original_text=text.strip(),
+            original_text=combined_text,
             crisis_analysis=m1_result,
             currentness_assessment=currentness_data,
         )

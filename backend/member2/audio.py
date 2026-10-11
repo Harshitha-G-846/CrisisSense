@@ -50,7 +50,7 @@ SUPPORTED_EXTENSIONS = {
 }
 
 # Default model size; override via DEFAULT_WHISPER_MODEL env var or argument.
-_DEFAULT_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "tiny")
+_DEFAULT_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "base")
 
 # Weight reduction applied to audio temporal evidence to reflect the inherent
 # uncertainty of a spoken claim vs. a documented timestamp.
