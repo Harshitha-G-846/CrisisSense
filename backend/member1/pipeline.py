@@ -7,28 +7,42 @@ from .needs_extractor import extract_needs
 from .location_extractor import extract_locations
 
 # ==================================================
+# Configuration
+# ==================================================
+
+# Probability threshold for classifying a message as crisis-related.
+# Chosen from the v2 validation results: precision/recall are balanced
+# around 0.50 and everyday non-crisis sentences score well below it.
+# If you later retune this, change it in ONE place — here.
+CRISIS_THRESHOLD = 0.50
+
+OUT_OF_SCOPE_MESSAGE = (
+    "This message is out of scope for crisis analysis."
+)
+
+# ==================================================
 # Project Paths
 # ==================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_DIR = BASE_DIR / "models"
 print("Loading models from:", MODEL_DIR.resolve())
+
 # ==================================================
-# 1. Load Crisis Detection Model
+# 1. Load Crisis Detection Model (v2)
 # ==================================================
 
 crisis_model = joblib.load(
-    MODEL_DIR / "crisis_classifier.pkl"
+    MODEL_DIR / "crisis_classifier_v2.pkl"
 )
 
 crisis_vectorizer = joblib.load(
-    MODEL_DIR / "tfidf_vectorizer.pkl"
+    MODEL_DIR / "tfidf_vectorizer_v2.pkl"
 )
 
 crisis_char_vectorizer = joblib.load(
-    MODEL_DIR / "crisis_char_vectorizer.pkl"
+    MODEL_DIR / "crisis_char_vectorizer_v2.pkl"
 )
-
 
 # ==================================================
 # 2. Load Information Type Model
@@ -45,7 +59,6 @@ word_vectorizer = joblib.load(
 char_vectorizer = joblib.load(
     MODEL_DIR / "information_type_char_vectorizer.pkl"
 )
-
 
 # ==================================================
 # 3. Load Incident Type Model
@@ -65,93 +78,20 @@ incident_vectorizer = joblib.load(
 # ==================================================
 
 def clean_text(text):
-    return text.lower()
+    return str(text).lower()
 
 
 # ==================================================
 # 5. Crisis Detection
 # ==================================================
 
-
-def is_clearly_benign_weather(text):
-    cleaned = " ".join(text.lower().split())
-
-    positive_weather_phrases = [
-        # General pleasant weather
-        "sunny",
-        "like",
-        "lovely",
-        "love",
-        "sunshine",
-        "clear sky",
-        "clear skies",
-        "blue sky",
-        "blue skies",
-        "nice weather",
-        "good weather",
-        "pleasant weather",
-        "beautiful weather",
-        "fair weather",
-        "mild weather",
-        "calm weather",
-        "normal weather",
-        "lovely weather",
-        "warm weather",
-        "cool weather",
-        "fresh air",
-        "gentle breeze",
-        "cool breeze",
-        "light breeze",
-        "partly cloudy",
-        "mostly sunny",
-        "cloudless sky",
-        "warm sunshine",
-        "light drizzle",
-        "comfortable temperature",
-
-        # Positive everyday expressions
-        "beautiful day",
-        "lovely day",
-        "pleasant day",
-        "peaceful day",
-        "nice day",
-        "good day",
-        "great day",
-        "feeling good",
-        "doing well",
-        "all good",
-        "no problem",
-        "everything fine",
-    ]
-
-    hazard_terms = [
-        "flood", "flooding", "flash flood", "disaster",
-        "emergency", "injured", "injuries", "trapped",
-        "evacuate", "evacuation", "damage", "destroyed",
-        "warning", "dangerous", "landslide", "cyclone",
-        "storm", "wildfire", "casualties", "rescue",
-        "heavy rainfall", "overflow", "collapsed",
-        "collapse", "earthquake", "tsunami", "explosion",
-        "fire", "drowning", "missing people", "stranded",
-        "power outage", "building damage", "road blocked",
-        "medical assistance", "need help", "urgent help",
-        "people trapped", "homes destroyed"
-    ]
-
-    has_positive_phrase = any(
-        phrase in cleaned
-        for phrase in positive_weather_phrases
-    )
-
-    has_hazard_term = any(
-        term in cleaned
-        for term in hazard_terms
-    )
-
-    return has_positive_phrase and not has_hazard_term
-
-
 def predict_crisis(text):
+    """
+    Returns (is_crisis: bool, crisis_probability: float).
+
+    Uses CRISIS_THRESHOLD (not sklearn's implicit 0.5 via .predict())
+    so the decision boundary is explicit and changeable in one place.
+    """
     cleaned = clean_text(text)
 
     word_features = crisis_vectorizer.transform([cleaned])
@@ -162,42 +102,36 @@ def predict_crisis(text):
         format="csr"
     )
 
-    prediction = crisis_model.predict(features)[0]
+    probabilities = crisis_model.predict_proba(features)[0]
+    classes = list(crisis_model.classes_)
 
-    print("Raw crisis prediction:", prediction)
+    if 1 in classes:
+        crisis_probability = float(probabilities[classes.index(1)])
+    else:
+        crisis_probability = 0.0
 
-    if hasattr(crisis_model, "predict_proba"):
-        probabilities = crisis_model.predict_proba(features)[0]
-        print("Class labels:", crisis_model.classes_)
-        print("Class probabilities:", probabilities)
+    is_crisis = crisis_probability >= CRISIS_THRESHOLD
 
-    return bool(prediction == 1)
+    print(f"Crisis probability: {crisis_probability:.4f}")
+    print(f"Threshold: {CRISIS_THRESHOLD}")
+    print(f"Prediction: {is_crisis}")
+
+    return is_crisis, crisis_probability
+
+
 # ==================================================
 # 6. Information Type Prediction
 # ==================================================
 
 def predict_information_type(text):
-
     cleaned = clean_text(text)
 
-    word_features = word_vectorizer.transform(
-        [cleaned]
-    )
+    word_features = word_vectorizer.transform([cleaned])
+    char_features = char_vectorizer.transform([cleaned])
 
-    char_features = char_vectorizer.transform(
-        [cleaned]
-    )
+    features = hstack([word_features, char_features])
 
-    features = hstack([
-        word_features,
-        char_features
-    ])
-
-    prediction = info_model.predict(
-        features
-    )[0]
-
-    return prediction
+    return info_model.predict(features)[0]
 
 
 # ==================================================
@@ -205,59 +139,53 @@ def predict_information_type(text):
 # ==================================================
 
 def predict_incident_type(text):
-
     cleaned = clean_text(text)
-
-    vector = incident_vectorizer.transform(
-        [cleaned]
-    )
-
-    prediction = incident_model.predict(
-        vector
-    )[0]
-
-    return prediction
+    vector = incident_vectorizer.transform([cleaned])
+    return incident_model.predict(vector)[0]
 
 
 # ==================================================
 # 8. Complete Crisis Analysis
 # ==================================================
 
+def _non_crisis_response(message=OUT_OF_SCOPE_MESSAGE,
+                         probability=None):
+    return {
+        "is_crisis": False,
+        "incident_type": None,
+        "information_type": None,
+        "severity": None,
+        "needs": [],
+        "locations": [],
+        "crisis_probability": probability,
+        "message": message,
+    }
+
+
 def analyze_crisis(text):
+    # Empty / missing text: this is the media-only case.
+    # Do NOT report it as a verified non-crisis; report it as unanalyzed.
+    if text is None or not str(text).strip():
+        return _non_crisis_response(
+            message=(
+                "No text provided. Text-based crisis analysis "
+                "is unavailable for this submission."
+            ),
+            probability=None,
+        )
 
-    # Handle clearly positive, harmless weather statements.
-    if is_clearly_benign_weather(text):
-        return {
-            "is_crisis": False,
-            "incident_type": None,
-            "information_type": None,
-            "severity": None,
-            "needs": [],
-            "locations": []
-        }
+    is_crisis, probability = predict_crisis(text)
 
-    is_crisis = predict_crisis(text)
-
-    # Stop if the model identifies it as non-crisis.
+    # If not crisis-related: stop immediately. Do NOT call the
+    # incident / information-type / severity / needs / location modules.
     if not is_crisis:
-        return {
-            "is_crisis": False,
-            "incident_type": None,
-            "information_type": None,
-            "severity": None,
-            "needs": [],
-            "locations": []
-        }
+        return _non_crisis_response(probability=probability)
 
+    # Only here do we run the downstream modules.
     incident_type = predict_incident_type(text)
     information_type = predict_information_type(text)
     severity = extract_severity(text)
-
-    needs = extract_needs(
-        information_type,
-        text
-    )
-
+    needs = extract_needs(information_type, text)
     locations = extract_locations(text)
 
     return {
@@ -266,7 +194,9 @@ def analyze_crisis(text):
         "information_type": information_type,
         "severity": severity,
         "needs": needs,
-        "locations": locations
+        "locations": locations,
+        "crisis_probability": probability,
+        "message": None,
     }
 
 
@@ -275,80 +205,26 @@ def analyze_crisis(text):
 # ==================================================
 
 if __name__ == "__main__":
-
-    text = input(
-        "\nEnter crisis text: "
-    )
-
+    text = input("\nEnter crisis text: ")
     result = analyze_crisis(text)
 
-    print(
-        "\n========== CrisisSense Analysis =========="
-    )
-
-    print(
-        "\nCrisis:",
-        result["is_crisis"]
-    )
-
-    print(
-        "Incident Type:",
-        result["incident_type"]
-    )
-
-    print(
-        "Information Type:",
-        result["information_type"]
-    )
-
-    print(
-        "Severity:",
-        result["severity"]
-    )
-
-    print(
-        "Needs:",
-        result["needs"]
-    )
+    print("\n========== CrisisSense Analysis ==========")
+    print("\nCrisis:", result["is_crisis"])
+    print("Crisis Probability:", result["crisis_probability"])
+    print("Message:", result["message"])
+    print("Incident Type:", result["incident_type"])
+    print("Information Type:", result["information_type"])
+    print("Severity:", result["severity"])
+    print("Needs:", result["needs"])
 
     print("\nLocations:")
-
     if result["locations"]:
-
         for location in result["locations"]:
-
-            print(
-                "Location:",
-                location["text"]
-            )
-
-            print(
-                "Display Name:",
-                location["display_name"]
-            )
-
-            print(
-                "City:",
-                location["city"]
-            )
-
-            print(
-                "State:",
-                location["state"]
-            )
-
-            print(
-                "Latitude:",
-                location["latitude"]
-            )
-
-            print(
-                "Longitude:",
-                location["longitude"]
-            )
-
+            print("Location:", location["text"])
+            print("Display Name:", location["display_name"])
+            print("City:", location["city"])
+            print("State:", location["state"])
+            print("Latitude:", location["latitude"])
+            print("Longitude:", location["longitude"])
     else:
-
-        print(
-            "No location detected."
-        )
+        print("No location detected.")
