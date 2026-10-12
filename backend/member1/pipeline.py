@@ -49,15 +49,15 @@ crisis_char_vectorizer = joblib.load(
 # ==================================================
 
 info_model = joblib.load(
-    MODEL_DIR / "information_type_classifier.pkl"
+    MODEL_DIR / "information_type_classifier_v2.pkl"
 )
 
 word_vectorizer = joblib.load(
-    MODEL_DIR / "information_type_word_vectorizer.pkl"
+    MODEL_DIR / "information_type_word_vectorizer_v2.pkl"
 )
 
 char_vectorizer = joblib.load(
-    MODEL_DIR / "information_type_char_vectorizer.pkl"
+    MODEL_DIR / "information_type_char_vectorizer_v2.pkl"
 )
 
 # ==================================================
