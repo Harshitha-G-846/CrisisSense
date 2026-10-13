@@ -33,6 +33,7 @@ from typing import Dict, List, Optional, Union
 from .audio import extract_audio_evidence
 from .fusion import fuse_evidence
 from .ocr import extract_image_evidence, load_image
+from .image_classifier import classify_image, is_model_available
 from .reference import extract_reference_evidence
 from .reuse import ReuseCorpus, check_image_reuse, check_video_frames_reuse
 from .schemas import (
@@ -129,6 +130,18 @@ def run_currentness_verification(
         )
         all_evidence.extend(image_evidence)
 
+
+        # Visual disaster classification (EfficientNet-B0, 6 classes)
+        if is_model_available():
+            try:
+                visual_evidence = classify_image(
+                    image_path,
+                    reference_date=ref_date,
+                )
+                all_evidence.extend(visual_evidence)
+            except Exception as exc:
+                print(f"[currentness_agent] Image classification failed: {exc}")
+                
         # Perceptual reuse detection if reuse corpus is provided
         if reuse_corpus is not None and len(reuse_corpus) > 0:
             pil_img = load_image(image_path)
@@ -152,6 +165,27 @@ def run_currentness_verification(
             ocr_text_override_per_frame=video_ocr_override_per_frame,
         )
         all_evidence.extend(video_evidence)
+
+        # Visual disaster classification on sampled video frames
+        if is_model_available():
+            try:
+                from .video import sample_video_frames
+                for frame in sample_video_frames(video_path, max_frames=3):
+                    visual_items = classify_image(
+                        frame["image"],
+                        reference_date=ref_date,
+                    )
+                    for item in visual_items:
+                        item.finding = (
+                            f"Video frame {frame['frame_index']} "
+                            f"(t={frame['timestamp_seconds']}s): {item.finding}"
+                        )
+                        if item.details is not None:
+                            item.details["frame_index"] = frame["frame_index"]
+                            item.details["timestamp_seconds"] = frame["timestamp_seconds"]
+                    all_evidence.extend(visual_items)
+            except Exception as exc:
+                print(f"[currentness_agent] Video frame classification failed: {exc}")
 
         # Perceptual reuse detection on sampled video frames if reuse corpus is provided
         if reuse_corpus is not None and len(reuse_corpus) > 0:

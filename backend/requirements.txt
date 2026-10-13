@@ -28,7 +28,7 @@ imagehash
 opencv-python-headless
 faster-whisper
 python-multipart
-
+torchvision
 #Member 3
 sqlalchemy
 torch

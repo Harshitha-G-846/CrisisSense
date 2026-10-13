@@ -29,7 +29,8 @@ class EvidenceSource(str, Enum):
     REUSE = "reuse"
     REFERENCE_CORPUS = "reference_corpus"
     CORROBORATION = "corroboration"
-
+    IMAGE_CLASSIFICATION = "image_classification"
+    IMAGE_NORMAL_CLASSIFICATION = "image_normal_classification"
 
 class EvidenceItem(BaseModel):
     source: EvidenceSource
