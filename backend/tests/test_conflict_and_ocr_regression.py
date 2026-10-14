@@ -52,7 +52,8 @@ from member2.ocr import (
 )
 from member2.video import extract_video_evidence, sample_video_frames
 from member3.database import Base, get_db
-from member3.models import Incident, Report
+from member3.models import Incident, Report, User
+from auth import create_access_token, hash_password
 from main import app, _get_report_conflicts, _format_currentness
 
 REF_DATE = date(2026, 10, 14)
@@ -89,6 +90,21 @@ def isolated_client(isolated_db: Session) -> Generator[TestClient, None, None]:
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.pop(get_db, None)
+
+
+@pytest.fixture
+def auth_header(isolated_db: Session) -> dict:
+    admin = User(
+        id="usr-conflict-admin",
+        full_name="Conflict Admin",
+        email="admin.conflict@resqsense.gov",
+        password_hash=hash_password("AdminPass123!"),
+        role="authority",
+    )
+    isolated_db.add(admin)
+    isolated_db.commit()
+    token = create_access_token(user_id=admin.id, email=admin.email, role="authority")
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _create_video_fixture_with_text(text: str, duration_sec: float = 1.5, fps: int = 10) -> str:
@@ -295,7 +311,9 @@ def test_ocr_clean_execution_with_no_text():
 # Test 5: End-to-End Conflict Persistence and API Reconstruction
 # ---------------------------------------------------------------------------
 
-def test_conflict_survives_analysis_and_incident_retrieval(isolated_client: TestClient, isolated_db: Session):
+def test_conflict_survives_analysis_and_incident_retrieval(
+    isolated_client: TestClient, isolated_db: Session, auth_header: dict
+):
     """
     Submits a report with cyclone text and earthquake visual evidence.
     Verifies that has_conflict: True and conflicts_detected survive in GET /incidents and GET /incidents/{id}.
@@ -348,7 +366,7 @@ def test_conflict_survives_analysis_and_incident_retrieval(isolated_client: Test
     isolated_db.commit()
 
     # 1. Test GET /incidents
-    resp = isolated_client.get("/incidents")
+    resp = isolated_client.get("/incidents", headers=auth_header)
     assert resp.status_code == 200
     incidents = resp.json()
     matched = next((inc for inc in incidents if inc["incident_id"] == "INC-TEST-CONFLICT-001"), None)
@@ -356,7 +374,7 @@ def test_conflict_survives_analysis_and_incident_retrieval(isolated_client: Test
     assert matched["has_conflict"] is True
 
     # 2. Test GET /incidents/{id}
-    detail_resp = isolated_client.get(f"/incidents/{incident.id}")
+    detail_resp = isolated_client.get(f"/incidents/{incident.id}", headers=auth_header)
     assert detail_resp.status_code == 200
     detail = detail_resp.json()
     assert detail["has_conflict"] is True
@@ -366,7 +384,9 @@ def test_conflict_survives_analysis_and_incident_retrieval(isolated_client: Test
     assert detail["reports"][0]["currentness"]["has_conflict"] is True
 
 
-def test_conflict_reconstructed_for_historical_record(isolated_client: TestClient, isolated_db: Session):
+def test_conflict_reconstructed_for_historical_record(
+    isolated_client: TestClient, isolated_db: Session, auth_header: dict
+):
     """
     Simulates the exact scenario of REP-d420ea6d12764c10ba7ea49061bab3ce:
     conflicts_detected was saved as [] initially, but crisis_analysis is Cyclone and
@@ -427,13 +447,13 @@ def test_conflict_reconstructed_for_historical_record(isolated_client: TestClien
     assert "Earthquake" in reconstructed[0]
 
     # Endpoint checks
-    list_resp = isolated_client.get("/incidents")
+    list_resp = isolated_client.get("/incidents", headers=auth_header)
     assert list_resp.status_code == 200
     inc_item = next((i for i in list_resp.json() if i["incident_id"] == "INC-HISTORICAL-001"), None)
     assert inc_item is not None
     assert inc_item["has_conflict"] is True
 
-    detail_resp = isolated_client.get("/incidents/INC-HISTORICAL-001")
+    detail_resp = isolated_client.get("/incidents/INC-HISTORICAL-001", headers=auth_header)
     assert detail_resp.status_code == 200
     detail = detail_resp.json()
     assert detail["has_conflict"] is True

@@ -33,6 +33,39 @@ class Base(DeclarativeBase):
     pass
 
 
+def ensure_schema_compatibility(target_engine=None):
+    """Safely updates database schema without wiping or dropping existing tables.
+    - Creates users table if missing.
+    - Adds nullable citizen_id column to incidents and reports if missing.
+    """
+    if target_engine is None:
+        target_engine = engine
+
+    # Create any missing tables (e.g. users) defined in metadata
+    Base.metadata.create_all(bind=target_engine)
+
+    with target_engine.connect() as conn:
+        cursor = conn.connection.cursor()
+        cursor.execute("PRAGMA table_info(incidents)")
+        inc_cols = {row[1] for row in cursor.fetchall()}
+        if inc_cols and "citizen_id" not in inc_cols:
+            cursor.execute("ALTER TABLE incidents ADD COLUMN citizen_id TEXT REFERENCES users(id)")
+
+        cursor.execute("PRAGMA table_info(reports)")
+        rep_cols = {row[1] for row in cursor.fetchall()}
+        if rep_cols and "citizen_id" not in rep_cols:
+            cursor.execute("ALTER TABLE reports ADD COLUMN citizen_id TEXT REFERENCES users(id)")
+
+        cursor.close()
+
+
+# Ensure live database schema is compatible on initial load
+try:
+    ensure_schema_compatibility(engine)
+except Exception:
+    pass
+
+
 # FastAPI can use this to open and close a session per request.
 def get_db():
     with SessionLocal() as session:

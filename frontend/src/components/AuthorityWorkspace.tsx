@@ -17,7 +17,9 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Truck,
+  User,
   X,
   XCircle,
 } from 'lucide-react'
@@ -86,6 +88,56 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
   const [feedbackInput, setFeedbackInput] = useState('')
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
   const [feedbackResult, setFeedbackResult] = useState<string | null>(null)
+
+  // Incident Deletion State
+  const [incidentToDelete, setIncidentToDelete] = useState<Incident | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [actionNotice, setActionNotice] = useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
+
+  // Handle Permanent Incident Deletion
+  const handleConfirmDelete = async () => {
+    if (!incidentToDelete?.incident_id || isDeleting) return
+    const targetId = incidentToDelete.incident_id
+    setIsDeleting(true)
+    setActionNotice(null)
+
+    try {
+      await api.deleteIncident(targetId)
+
+      // Immediately remove from state so list, queue counts, and map markers update instantly
+      setIncidents((prev) => prev.filter((inc) => inc.incident_id !== targetId))
+
+      // If the deleted incident was currently selected in the inspector, clear selection
+      if (selectedIncident?.incident_id === targetId) {
+        setSelectedIncident(null)
+        setIncidentDetail(null)
+        setResponsePlan(null)
+        setAuthResult(null)
+      }
+
+      setActionNotice({
+        type: 'success',
+        text: `Incident ${targetId} was permanently deleted.`,
+      })
+      setIncidentToDelete(null)
+
+      // Background reload from API to ensure full synchronization with backend
+      void loadIncidents()
+    } catch (err) {
+      setActionNotice({
+        type: 'error',
+        text:
+          err instanceof Error
+            ? `Failed to delete incident: ${err.message}`
+            : 'Failed to delete incident.',
+      })
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   useEffect(() => {
     setActiveQueue(initialTab)
@@ -416,6 +468,28 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
         </div>
       </header>
 
+      {/* Action Notification Banner */}
+      {actionNotice && (
+        <div className={`workspace-action-banner ${actionNotice.type}`} role="status">
+          <div className="action-banner-content">
+            {actionNotice.type === 'success' ? (
+              <CheckCircle2 size={16} />
+            ) : (
+              <AlertCircle size={16} />
+            )}
+            <span>{actionNotice.text}</span>
+          </div>
+          <button
+            type="button"
+            className="action-banner-close"
+            onClick={() => setActionNotice(null)}
+            aria-label="Dismiss message"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Queue Tabs & Sort Toolbar */}
       <div className="authority-queue-nav">
         <div className="queue-tabs-group">
@@ -594,9 +668,24 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
                       <span className="incident-card-id">
                         {incident.incident_id}
                       </span>
-                      <span className={`badge badge-${sev.toLowerCase()}`}>
-                        {sev}
-                      </span>
+                      <div className="card-topline-right">
+                        <span className={`badge badge-${sev.toLowerCase()}`}>
+                          {sev}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn-delete-incident"
+                          title={`Delete incident ${incident.incident_id}`}
+                          aria-label={`Delete incident ${incident.incident_id}`}
+                          disabled={isDeleting}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setIncidentToDelete(incident)
+                          }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
 
                     <h3 className="incident-card-title">
@@ -801,6 +890,62 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
                         {selectedIncident.response_status || 'NOT_PLANNED'}
                       </strong>
                     </div>
+                  </div>
+                </section>
+
+                {/* Submitting Citizen Identity Section */}
+                <section className="inspector-section submitting-citizen-section">
+                  <h3 className="section-title">
+                    <User size={16} />
+                    <span>Submitting Citizen Identity</span>
+                  </h3>
+
+                  <div className="meta-card-grid">
+                    <div className="meta-card">
+                      <span className="card-lbl">Citizen Name</span>
+                      <strong>
+                        {incidentDetail?.submitting_citizen?.full_name || 'Anonymous submission'}
+                      </strong>
+                    </div>
+
+                    <div className="meta-card">
+                      <span className="card-lbl">Registered Email</span>
+                      <strong>
+                        {incidentDetail?.submitting_citizen?.email || 'No linked citizen account'}
+                      </strong>
+                    </div>
+
+                    <div className="meta-card">
+                      <span className="card-lbl">Account Status</span>
+                      <div>
+                        {incidentDetail?.submitting_citizen?.email && incidentDetail.submitting_citizen.email !== 'No linked citizen account' ? (
+                          <span
+                            className="badge badge-verified"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                          >
+                            <ShieldCheck size={12} />
+                            <span>Authenticated Citizen</span>
+                          </span>
+                        ) : (
+                          <span
+                            className="badge badge-pending"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                          >
+                            <HelpCircle size={12} />
+                            <span>No linked citizen account</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {incidentDetail?.submitting_citizen?.id && (
+                      <div className="meta-card">
+                        <span className="card-lbl">Citizen Account ID</span>
+                        <code style={{ fontSize: '11px', color: '#818cf8', wordBreak: 'break-all' }}>
+                          {incidentDetail.submitting_citizen.id}
+                        </code>
+                      </div>
+                    )}
                   </div>
                 </section>
 
@@ -1394,6 +1539,72 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
             )}
             </ErrorBoundary>
           </main>
+        </div>
+      )}
+
+      {/* Permanent Deletion Confirmation Modal Dialog */}
+      {incidentToDelete && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-dialog-title"
+          onClick={() => !isDeleting && setIncidentToDelete(null)}
+        >
+          <div
+            className="delete-confirm-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="delete-modal-header">
+              <div className="delete-modal-icon">
+                <Trash2 size={20} />
+              </div>
+              <div className="delete-modal-titles">
+                <h3 id="delete-dialog-title">Delete Incident</h3>
+                <span className="delete-modal-id">
+                  {incidentToDelete.incident_id}
+                </span>
+              </div>
+            </div>
+
+            <div className="delete-modal-body">
+              <p className="delete-modal-message">
+                Are you sure you want to permanently delete this incident?
+              </p>
+              <p className="delete-modal-subtext">
+                This will permanently delete this incident along with its linked citizen reports and evidence from the database. This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="delete-modal-actions">
+              <button
+                type="button"
+                className="btn-modal-cancel"
+                disabled={isDeleting}
+                onClick={() => setIncidentToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-modal-delete"
+                disabled={isDeleting}
+                onClick={() => void handleConfirmDelete()}
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw size={14} className="spinner" />
+                    <span>Deleting…</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

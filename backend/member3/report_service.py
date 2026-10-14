@@ -8,6 +8,7 @@ def save_report(
     original_text: str,
     crisis_analysis: dict,
     currentness_assessment: dict,
+    citizen_id: str | None = None,
 ) -> Report:
     if not original_text.strip():
         raise ValueError("Report text cannot be empty.")
@@ -16,6 +17,7 @@ def save_report(
         original_text=original_text,
         crisis_analysis=crisis_analysis,
         currentness_assessment=currentness_assessment,
+        citizen_id=citizen_id,
     )
 
     try:

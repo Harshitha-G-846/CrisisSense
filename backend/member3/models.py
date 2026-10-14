@@ -21,6 +21,28 @@ def new_report_id():
     return f"REP-{uuid4().hex}"
 
 
+def new_user_id():
+    return f"USER-{uuid4().hex}"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, default=new_user_id)
+    full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="citizen", index=True)
+
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(
+        DateTime, nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+    incidents = relationship("Incident", back_populates="citizen")
+    reports = relationship("Report", back_populates="citizen")
+
+
 class Incident(Base):
     __tablename__ = "incidents"
 
@@ -51,7 +73,20 @@ class Incident(Base):
         DateTime, nullable=False, default=utc_now, onupdate=utc_now
     )
 
-    reports = relationship("Report", back_populates="incident")
+    # Optional citizen ownership association (nullable for legacy/authority incidents)
+    citizen_id = Column(
+        String,
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
+
+    citizen = relationship("User", back_populates="incidents")
+    reports = relationship(
+        "Report",
+        back_populates="incident",
+        cascade="all, delete-orphan",
+    )
 
 
 class Report(Base):
@@ -67,6 +102,14 @@ class Report(Base):
         index=True,
     )
 
+    # Optional citizen ownership association
+    citizen_id = Column(
+        String,
+        ForeignKey("users.id"),
+        nullable=True,
+        index=True,
+    )
+
     original_text = Column(Text, nullable=False)
 
     # Preserve the complete outputs, including evidence and locations.
@@ -75,6 +118,7 @@ class Report(Base):
 
     received_at = Column(DateTime, nullable=False, default=utc_now)
 
+    citizen = relationship("User", back_populates="reports")
     incident = relationship("Incident", back_populates="reports")
 
 class Resource(Base):
@@ -116,3 +160,12 @@ class Resource(Base):
         default=utc_now,
         onupdate=utc_now,
     )
+
+
+# Automatically apply safe, backward-compatible schema updates
+from .database import engine, ensure_schema_compatibility
+
+try:
+    ensure_schema_compatibility(engine)
+except Exception:
+    pass

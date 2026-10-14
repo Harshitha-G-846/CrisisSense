@@ -16,7 +16,7 @@ interface LandingPageProps {
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onSelectRole,
-  incidentCount = 8,
+  incidentCount = 0,
 }) => {
   return (
     <div className="resq-landing-wrapper">

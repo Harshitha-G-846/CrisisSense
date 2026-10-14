@@ -187,6 +187,7 @@ def create_incident_from_report(
         needs=list(analysis.get("needs") or []),
         verification_status="PENDING",
         status="OPEN",
+        citizen_id=report.citizen_id,
     )
 
     try:
@@ -207,3 +208,30 @@ def create_incident_from_report(
         raise
 
     return incident
+
+
+def delete_incident(db: Session, incident_id: str) -> bool:
+    """Permanently delete an incident and its associated reports.
+
+    Cascades safely to linked reports to avoid orphaned records and foreign-key violations.
+    Preserves all unrelated incidents and reports.
+    Returns True if found and deleted, False if nonexistent.
+    """
+    incident = db.get(Incident, incident_id)
+    if incident is None:
+        return False
+
+    try:
+        # Delete associated reports to prevent foreign key violations and orphaned records
+        reports = db.scalars(
+            select(Report).where(Report.incident_id == incident_id)
+        ).all()
+        for report in reports:
+            db.delete(report)
+
+        db.delete(incident)
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        raise

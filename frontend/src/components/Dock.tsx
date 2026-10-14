@@ -74,12 +74,6 @@ export const Dock: React.FC<DockProps> = ({
       label: 'Crisis Map',
       icon: <MapIcon size={20} />,
     },
-    {
-      id: 'switch-role',
-      label: 'Authority Ops',
-      icon: <ArrowLeftRight size={20} />,
-      action: () => onNavigate('authority-overview'),
-    },
   ]
 
   const authorityItems: DockItem[] = [

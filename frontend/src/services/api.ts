@@ -92,10 +92,42 @@ export interface Incident {
   [key: string]: unknown
 }
 
+export interface SubmittingCitizenInfo {
+  id?: string | null
+  full_name?: string | null
+  email?: string | null
+  role?: string | null
+  is_anonymous?: boolean
+}
+
 export interface IncidentDetail extends Incident {
   reports?: LinkedReport[]
   has_conflict?: boolean
   conflicts_detected?: string[]
+  submitting_citizen?: SubmittingCitizenInfo | null
+}
+
+export interface CitizenUser {
+  id: string
+  full_name: string
+  email: string
+  role: 'citizen' | 'authority' | string
+  created_at?: string
+}
+
+export interface AuthResponse {
+  access_token: string
+  token_type: string
+  user: CitizenUser
+}
+
+export interface EmailNotificationStatus {
+  status: 'SENT' | 'MOCKED' | 'FAILED' | 'SKIPPED' | string
+  recipient?: string
+  subject?: string
+  message?: string
+  tracking_url?: string
+  error?: string
 }
 
 export interface AnalyzeResult {
@@ -106,6 +138,7 @@ export interface AnalyzeResult {
   currentness: CurrentnessData
   has_conflict?: boolean
   conflicts_detected?: string[]
+  email_notification?: EmailNotificationStatus
 }
 
 export interface VerificationResponse {
@@ -206,12 +239,76 @@ export interface ResourceListResponse {
   items: ResourceItem[]
 }
 
+// --- Authentication Storage Helpers ---
+const AUTH_TOKEN_KEY = 'resq_auth_token'
+const AUTH_USER_KEY = 'resq_user'
+
+export const authStorage = {
+  getToken: (): string | null => {
+    try {
+      return localStorage.getItem(AUTH_TOKEN_KEY)
+    } catch {
+      return null
+    }
+  },
+  setToken: (token: string): void => {
+    try {
+      localStorage.setItem(AUTH_TOKEN_KEY, token)
+    } catch {}
+  },
+  clearToken: (): void => {
+    try {
+      localStorage.removeItem(AUTH_TOKEN_KEY)
+    } catch {}
+  },
+  getUser: (): CitizenUser | null => {
+    try {
+      const data = localStorage.getItem(AUTH_USER_KEY)
+      return data ? JSON.parse(data) : null
+    } catch {
+      return null
+    }
+  },
+  setUser: (user: CitizenUser): void => {
+    try {
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user))
+    } catch {}
+  },
+  clearUser: (): void => {
+    try {
+      localStorage.removeItem(AUTH_USER_KEY)
+    } catch {}
+  },
+  clearAll: (): void => {
+    authStorage.clearToken()
+    authStorage.clearUser()
+  },
+  getRole: (): string | null => {
+    const user = authStorage.getUser()
+    return user ? user.role : null
+  },
+  isCitizen: (): boolean => {
+    const user = authStorage.getUser()
+    return Boolean(authStorage.getToken() && user && user.role === 'citizen')
+  },
+  isAuthority: (): boolean => {
+    const user = authStorage.getUser()
+    return Boolean(
+      authStorage.getToken() &&
+        user &&
+        (user.role === 'authority' || user.role === 'admin'),
+    )
+  },
+}
+
 // --- Request Wrapper ---
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const isFormData = options.body instanceof FormData
+  const token = authStorage.getToken()
   const headers: Record<string, string> = {
     ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string>),
   }
 
@@ -333,4 +430,71 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     }),
+
+  deleteIncident: (incidentId: string) =>
+    request<{
+      success: boolean
+      incident_id: string
+      message: string
+    }>(`/incidents/${encodeURIComponent(incidentId)}`, {
+      method: 'DELETE',
+    }),
+
+  // --- Citizen Authentication & Profile ---
+  registerCitizen: async (data: { full_name: string; email: string; password: string }) => {
+    const res = await request<AuthResponse>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    authStorage.setToken(res.access_token)
+    authStorage.setUser(res.user)
+    return res
+  },
+
+  loginCitizen: async (data: { email: string; password: string }) => {
+    const res = await request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    authStorage.setToken(res.access_token)
+    authStorage.setUser(res.user)
+    return res
+  },
+
+  loginAdmin: async (data: { email: string; password: string }) => {
+    const res = await request<AuthResponse>('/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+    authStorage.setToken(res.access_token)
+    authStorage.setUser(res.user)
+    return res
+  },
+
+  getProfile: () => request<CitizenUser>('/auth/me'),
+
+  logoutCitizen: async () => {
+    try {
+      await request<{ message: string }>('/auth/logout', { method: 'POST' })
+    } finally {
+      authStorage.clearAll()
+    }
+  },
+
+  logoutAdmin: async () => {
+    try {
+      await request<{ message: string }>('/auth/logout', { method: 'POST' })
+    } finally {
+      authStorage.clearAll()
+    }
+  },
+
+  listCitizenIncidents: () => request<Incident[]>('/citizen/incidents'),
+
+  getPublicStats: () =>
+    request<{
+      total_incidents: number
+      monitored_incidents: number
+      grid_status: string
+    }>('/public/stats'),
 }

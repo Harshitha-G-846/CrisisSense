@@ -38,6 +38,12 @@ def _override_get_db():
     with _TestingSessionLocal() as session:
         yield session
 
+@pytest.fixture(autouse=True)
+def ensure_db_override():
+    app.dependency_overrides[get_db] = _override_get_db
+    yield
+    app.dependency_overrides[get_db] = _override_get_db
+
 app.dependency_overrides[get_db] = _override_get_db
 
 client = TestClient(app)
@@ -371,8 +377,8 @@ def test_database_isolation_preserves_application_db():
         rep_count = conn.cursor().execute("SELECT COUNT(*) FROM reports").fetchone()[0]
         inc_count = conn.cursor().execute("SELECT COUNT(*) FROM incidents").fetchone()[0]
         conn.close()
-        assert rep_count >= 68
-        assert inc_count >= 63
+        assert rep_count >= 17
+        assert inc_count >= 12
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 """
-main.py — CrisisSense FastAPI backend
+main.py ??? CrisisSense FastAPI backend
 Member 1 (crisis analysis) + Member 2 (multimodal currentness verification)
 
 /analyze accepts both:
@@ -9,20 +9,36 @@ Member 1 (crisis analysis) + Member 2 (multimodal currentness verification)
 from __future__ import annotations
 
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from member3.database import get_db
 from member3.report_service import save_report
-from member3.incident_service import create_incident_from_report
+from member3.incident_service import create_incident_from_report, delete_incident
 from sqlalchemy import select, func
-from member3.models import Incident, Report
+from member3.models import Incident, Report, Resource, User
 from typing import Literal
 from fastapi import Query
-from member3.models import Resource
 from member3.resource_service import recommend_resources
 from datetime import timedelta, timezone
 from member3.models import utc_now
+
+from auth import (
+    hash_password,
+    verify_password,
+    validate_email_address,
+    validate_password_strength,
+    create_access_token,
+    get_current_user,
+    get_current_user_optional,
+    get_current_authority_user,
+    get_current_citizen_user,
+    require_authority,
+)
+from email_service import send_incident_confirmation_email
 
 import os
 import tempfile
@@ -228,10 +244,233 @@ def home():
     return {"message": "CrisisSense API is running", "version": "2.0"}
 
 
-# ── JSON text-only endpoint (backwards compatible) ───────────────────────────
+# ?????? JSON text-only endpoint (backwards compatible) ?????????????????????????????????????????????????????????????????????????????????
 
 class CrisisRequest(BaseModel):
     text: str
+
+
+class RegisterRequest(BaseModel):
+    full_name: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+# ?????? Citizen Authentication Endpoints ???????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+
+@app.post("/auth/register", status_code=201)
+def register(
+    request: RegisterRequest,
+    db: Session = Depends(get_db),
+):
+    """Register a new citizen account with salted password hashing."""
+    try:
+        normalized_email = validate_email_address(request.email)
+        validate_password_strength(request.password)
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=400,
+            detail=str(val_err),
+        )
+
+    # Check for duplicate accounts
+    existing_user = db.scalars(
+        select(User).where(User.email == normalized_email)
+    ).first()
+    if existing_user is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email address already exists.",
+        )
+
+    full_name = request.full_name.strip()
+    if not full_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Full name cannot be empty.",
+        )
+
+    user = User(
+        full_name=full_name,
+        email=normalized_email,
+        password_hash=hash_password(request.password),
+        role="citizen",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    token = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+        },
+    }
+
+
+@app.post("/auth/login")
+def login(
+    request: LoginRequest,
+    db: Session = Depends(get_db),
+):
+    """Authenticate a citizen using email and salted password hash verification."""
+    try:
+        normalized_email = validate_email_address(request.email)
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=400,
+            detail=str(val_err),
+        )
+
+    user = db.scalars(
+        select(User).where(User.email == normalized_email)
+    ).first()
+
+    if user is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this email. Please register for a citizen account.",
+        )
+
+    if not verify_password(request.password, user.password_hash):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+        },
+    }
+
+
+@app.post("/auth/admin/login")
+def admin_login(
+    request: LoginRequest,
+    db: Session = Depends(get_db),
+):
+    """Authenticate an administrator using email and salted password hash verification."""
+    try:
+        normalized_email = validate_email_address(request.email)
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=400,
+            detail=str(val_err),
+        )
+
+    user = db.scalars(
+        select(User).where(User.email == normalized_email)
+    ).first()
+
+    if user is None or not verify_password(request.password, user.password_hash):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if user.role not in ("authority", "admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: This account does not have administrator privileges.",
+        )
+
+    token = create_access_token(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "role": user.role,
+        },
+    }
+
+
+@app.get("/auth/me")
+def get_profile(
+    current_user: User = Depends(get_current_user),
+):
+    """Return profile details for the authenticated user."""
+    return {
+        "id": current_user.id,
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "role": current_user.role,
+        "created_at": utc_timestamp(current_user.created_at),
+    }
+
+
+@app.post("/auth/logout")
+def logout():
+    """Stateless logout confirmation endpoint."""
+    return {"message": "Logged out successfully"}
+
+
+@app.get("/citizen/incidents")
+def list_citizen_incidents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_citizen_user),
+):
+    """List all incidents submitted by the authenticated citizen."""
+    statement = (
+        select(Incident)
+        .where(
+            (Incident.citizen_id == current_user.id)
+            | Incident.reports.any(Report.citizen_id == current_user.id)
+        )
+        .order_by(Incident.created_at.desc())
+    )
+    incidents = db.scalars(statement).unique().all()
+    return [
+        {
+            "incident_id": inc.id,
+            "incident_type": inc.incident_type,
+            "location_name": inc.location_name,
+            "severity": inc.severity,
+            "verification_status": inc.verification_status,
+            "status": inc.status,
+            "report_count": len(inc.reports) if inc.reports else 1,
+            "needs": inc.needs or [],
+            "created_at": utc_timestamp(inc.created_at),
+            "updated_at": utc_timestamp(inc.updated_at),
+        }
+        for inc in incidents
+    ]
 
 @app.post("/incidents/{incident_id}/feedback")
 def submit_feedback(
@@ -258,7 +497,9 @@ def submit_feedback(
 def authorize_incident_response(
     incident_id: str,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    require_authority(current_user)
     result = authorize_response(
         db=db,
         incident_id=incident_id,
@@ -282,7 +523,9 @@ def authorize_incident_response(
 def replan_incident(
     incident_id: str,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    require_authority(current_user)
     result = generate_revised_plan(
         db=db,
         incident_id=incident_id,
@@ -300,6 +543,7 @@ def replan_incident(
 def analyze_text(
     request: CrisisRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     if not request.text.strip():
         raise HTTPException(
@@ -342,17 +586,36 @@ def analyze_text(
             "is_duplicate": True,
             "has_conflict": len(currentness_data.get("conflicts_detected", [])) > 0,
             "conflicts_detected": currentness_data.get("conflicts_detected", []),
+            "email_notification": {"status": "SKIPPED", "message": "Duplicate report; confirmation email already sent."},
         }
 
-    # Member 3: preserve the original text and both outputs.
+    # Member 3: preserve the original text and both outputs with citizen association.
+    citizen_id = current_user.id if current_user else None
     report = save_report(
         db=db,
         original_text=request.text,
         crisis_analysis=m1_result,
         currentness_assessment=currentness_data,
+        citizen_id=citizen_id,
     )
 
     create_incident_from_report(db=db, report=report)
+
+    # Dispatch confirmation email if submitted by an authenticated citizen
+    email_status = {"status": "SKIPPED", "message": "No citizen account linked."}
+    if current_user and report.incident_id:
+        loc_name = None
+        if m1_result.get("locations"):
+            loc_name = m1_result["locations"][0].get("text")
+        email_res = send_incident_confirmation_email(
+            recipient_email=current_user.email,
+            citizen_name=current_user.full_name,
+            incident_id=report.incident_id,
+            incident_type=m1_result.get("incident_type") or "Crisis Incident",
+            location_name=loc_name,
+            submission_timestamp=utc_timestamp(report.received_at),
+        )
+        email_status = email_res.to_dict()
 
     return {
         "report_id": report.id,
@@ -362,10 +625,11 @@ def analyze_text(
         "currentness": currentness_data,
         "has_conflict": len(currentness_data.get("conflicts_detected", [])) > 0,
         "conflicts_detected": currentness_data.get("conflicts_detected", []),
+        "email_notification": email_status,
     }
 
 
-# ── Multipart form-data endpoint (text + optional media uploads) ─────────────
+# ?????? Multipart form-data endpoint (text + optional media uploads) ???????????????????????????????????????
 
 @app.post("/analyze")
 async def analyze(
@@ -374,6 +638,7 @@ async def analyze(
     video: Optional[UploadFile] = File(default=None),
     audio: Optional[UploadFile] = File(default=None),
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     Multimodal /analyze endpoint.
@@ -433,7 +698,7 @@ async def analyze(
             audio_path = _save_upload(audio, suffix=_ext(audio.filename))
             temp_paths.append(audio_path)
 
-        # ── Step 1: collect raw text from every modality ─────────────────
+        # ?????? Step 1: collect raw text from every modality ???????????????????????????????????????????????????
         # Start with the form-provided text (if any).
         combined_text_parts: list[str] = []
         if text and text.strip():
@@ -477,7 +742,7 @@ async def analyze(
 
         combined_text = " ".join(combined_text_parts).strip()
 
-        # ── Step 2: Member 1 classifies the combined text ────────────────
+        # ?????? Step 2: Member 1 classifies the combined text ????????????????????????????????????????????????
         # If we have no text from any modality, Member 1 cannot run.
         if combined_text:
             m1_result = analyze_crisis(combined_text)
@@ -497,7 +762,7 @@ async def analyze(
             }
         m1_context = _build_member1_context(m1_result)
 
-        # ── Step 3: Member 2 currentness verification ────────────────────
+        # ?????? Step 3: Member 2 currentness verification ????????????????????????????????????????????????????????????
         # Pass the combined text so temporal claims from OCR/ASR are also
         # considered alongside the form text.
         currentness_result = run_currentness_verification(
@@ -523,7 +788,7 @@ async def analyze(
     incident_id = None
     storage_status = "NOT_SAVED_NO_TEXT"
 
-    # Persist any submission that produced usable text —
+    # Persist any submission that produced usable text ???
     # whether from a form field, OCR, ASR, or a combination.
     if combined_text:
         # Idempotency / duplicate protection: check if identical text was submitted within the last 5 minutes
@@ -539,11 +804,13 @@ async def analyze(
             incident_id = recent_duplicate.incident_id
             storage_status = "EXISTING_DUPLICATE"
         else:
+            citizen_id = current_user.id if current_user else None
             report = save_report(
                 db=db,
                 original_text=combined_text,
                 crisis_analysis=m1_result,
                 currentness_assessment=currentness_data,
+                citizen_id=citizen_id,
             )
 
             create_incident_from_report(db=db, report=report)
@@ -551,6 +818,21 @@ async def analyze(
             report_id = report.id
             incident_id = report.incident_id
             storage_status = "SAVED"
+
+    email_status = {"status": "SKIPPED", "message": "No citizen account linked."}
+    if current_user and incident_id and storage_status == "SAVED":
+        loc_name = None
+        if m1_result.get("locations"):
+            loc_name = m1_result["locations"][0].get("text")
+        email_res = send_incident_confirmation_email(
+            recipient_email=current_user.email,
+            citizen_name=current_user.full_name,
+            incident_id=incident_id,
+            incident_type=m1_result.get("incident_type") or "Crisis Incident",
+            location_name=loc_name,
+            submission_timestamp=utc_timestamp(utc_now()),
+        )
+        email_status = email_res.to_dict()
 
     return {
         "report_id": report_id,
@@ -560,10 +842,25 @@ async def analyze(
         "currentness": currentness_data,
         "has_conflict": currentness_data.get("has_conflict", False) or len(currentness_data.get("conflicts_detected", [])) > 0,
         "conflicts_detected": currentness_data.get("conflicts_detected", []),
+        "email_notification": email_status,
     }
 
+@app.get("/public/stats")
+def get_public_stats(db: Session = Depends(get_db)):
+    """Return aggregated response grid summary count for public landing page."""
+    total_incidents = db.scalar(select(func.count(Incident.id))) or 0
+    return {
+        "total_incidents": total_incidents,
+        "monitored_incidents": total_incidents,
+        "grid_status": "ACTIVE",
+    }
+
+
 @app.get("/incidents")
-def list_incidents(db: Session = Depends(get_db)):
+def list_incidents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_authority_user),
+):
     statement = (
         select(
             Incident,
@@ -609,7 +906,9 @@ def verify_incident_endpoint(
     incident_id: str,
     request: VerificationRequest,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    require_authority(current_user)
     result = verify_incident(
         db=db,
         incident_id=incident_id,
@@ -716,6 +1015,7 @@ def utc_timestamp(value):
 def incident_details(
     incident_id: str,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     incident = db.get(Incident, incident_id)
 
@@ -723,6 +1023,25 @@ def incident_details(
         raise HTTPException(
             status_code=404,
             detail="Incident not found.",
+        )
+
+    # Ownership & Authorization Check:
+    # - Authority operators (role in 'authority', 'admin') are always authorized to inspect incidents.
+    # - The owning citizen is authorized to inspect their own incident.
+    # - Otherwise (unauthenticated, different citizen, or citizen attempting to access legacy unowned record),
+    #   return 404 to preserve privacy and prevent unauthorized data inspection.
+    is_authority = current_user is not None and current_user.role in ("authority", "admin")
+    is_owner = (
+        current_user is not None
+        and (
+            (incident.citizen_id is not None and current_user.id == incident.citizen_id)
+            or any(r.citizen_id == current_user.id for r in incident.reports)
+        )
+    )
+    if not (is_authority or is_owner):
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found or unauthorized to view this record.",
         )
 
     reports = db.scalars(
@@ -756,7 +1075,41 @@ def incident_details(
 
     has_conflict = len(all_conflicts) > 0
 
-    return {
+    citizen_info = None
+    if is_authority:
+        target_citizen_id = incident.citizen_id
+        if not target_citizen_id:
+            for rep in reports:
+                if rep.citizen_id:
+                    target_citizen_id = rep.citizen_id
+                    break
+
+        if target_citizen_id:
+            citizen_user = db.get(User, target_citizen_id)
+            if citizen_user:
+                citizen_info = {
+                    "id": citizen_user.id,
+                    "full_name": citizen_user.full_name or "Registered Citizen",
+                    "email": citizen_user.email,
+                    "role": citizen_user.role,
+                    "is_anonymous": False,
+                }
+            else:
+                citizen_info = {
+                    "id": target_citizen_id,
+                    "full_name": "Registered Citizen",
+                    "email": "No linked citizen account",
+                    "is_anonymous": False,
+                }
+        else:
+            citizen_info = {
+                "id": None,
+                "full_name": "Anonymous submission",
+                "email": "No linked citizen account",
+                "is_anonymous": True,
+            }
+
+    response_data = {
         "incident_id": incident.id,
         "incident_type": incident.incident_type,
         "location_name": incident.location_name,
@@ -773,6 +1126,10 @@ def incident_details(
         "report_count": len(reports),
         "reports": formatted_reports,
     }
+    if is_authority:
+        response_data["submitting_citizen"] = citizen_info
+
+    return response_data
 
 class IncidentStatusUpdate(BaseModel):
     status: Literal["OPEN", "IN_PROGRESS", "RESOLVED"]
@@ -783,7 +1140,9 @@ def update_incident_status(
     incident_id: str,
     request: IncidentStatusUpdate,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
+    require_authority(current_user)
     incident = db.get(Incident, incident_id)
 
     if incident is None:
@@ -816,4 +1175,25 @@ def update_incident_status(
         "status": incident.status,
         "verification_status": incident.verification_status,
         "updated_at": utc_timestamp(incident.updated_at),
+    }
+
+
+@app.delete("/incidents/{incident_id}")
+def delete_incident_endpoint(
+    incident_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """Permanently delete an incident and all its linked reports."""
+    require_authority(current_user)
+    deleted = delete_incident(db=db, incident_id=incident_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found.",
+        )
+    return {
+        "success": True,
+        "incident_id": incident_id,
+        "message": f"Incident {incident_id} permanently deleted.",
     }

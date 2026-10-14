@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -22,12 +22,18 @@ import {
   AlertTriangle,
   Check,
   Eye,
+  LogIn,
+  Mail,
 } from 'lucide-react'
 import {
   api,
+  authStorage,
   type AnalyzeResult,
+  type CitizenUser,
+  type Incident,
   type IncidentDetail,
 } from '../services/api'
+import { AuthModal } from './AuthModal'
 
 interface SavedReport {
   incident_id: string
@@ -41,11 +47,24 @@ const LOCAL_STORAGE_KEY = 'resq_sense_citizen_reports'
 
 export const CitizenPortal: React.FC<{
   initialView?: 'home' | 'report' | 'status'
+  initialIncidentId?: string
   onViewMap?: () => void
-}> = ({ initialView = 'home', onViewMap }) => {
+  onLogout?: () => void
+}> = ({ initialView = 'home', initialIncidentId, onViewMap }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'report' | 'status'>(
-    initialView,
+    initialIncidentId ? 'status' : initialView,
   )
+
+  // Citizen Authentication State
+  const [currentUser, setCurrentUser] = useState<CitizenUser | null>(() =>
+    authStorage.getUser(),
+  )
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [authModalMessage, setAuthModalMessage] = useState<string | undefined>()
+
+  // Citizen-specific server-side incidents isolation
+  const [myIncidents, setMyIncidents] = useState<Incident[]>([])
+  const [loadingIncidents, setLoadingIncidents] = useState(false)
 
   // Report Form State
   const [description, setDescription] = useState('')
@@ -67,7 +86,7 @@ export const CitizenPortal: React.FC<{
   const [copiedId, setCopiedId] = useState(false)
 
   // Status Lookup State
-  const [searchId, setSearchId] = useState('')
+  const [searchId, setSearchId] = useState(initialIncidentId || '')
   const [trackedIncident, setTrackedIncident] = useState<IncidentDetail | null>(
     null,
   )
@@ -82,9 +101,60 @@ export const CitizenPortal: React.FC<{
   // Saved Reports in LocalStorage
   const [savedReports, setSavedReports] = useState<SavedReport[]>([])
 
+  // Fetch only the authenticated citizen's personal incidents
+  const refreshMyIncidents = useCallback(async () => {
+    if (!authStorage.getToken() || !authStorage.isCitizen()) {
+      setMyIncidents([])
+      return
+    }
+    setLoadingIncidents(true)
+    try {
+      const data = await api.listCitizenIncidents()
+      setMyIncidents(data)
+    } catch (err) {
+      console.warn('Could not load citizen incidents:', err)
+      setMyIncidents([])
+    } finally {
+      setLoadingIncidents(false)
+    }
+  }, [])
+
+  // Hydrate citizen user profile and verify active session token
   useEffect(() => {
-    setActiveTab(initialView)
-  }, [initialView])
+    const token = authStorage.getToken()
+    if (token) {
+      api
+        .getProfile()
+        .then((profile) => {
+          setCurrentUser(profile)
+          authStorage.setUser(profile)
+        })
+        .catch(() => {
+          authStorage.clearAll()
+          setCurrentUser(null)
+          setMyIncidents([])
+        })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'citizen') {
+      void refreshMyIncidents()
+    } else {
+      setMyIncidents([])
+    }
+  }, [currentUser, refreshMyIncidents])
+
+  // Auto-track initial incident ID if provided
+  useEffect(() => {
+    if (initialIncidentId) {
+      setSearchId(initialIncidentId)
+      setActiveTab('status')
+      void handleTrackIncident(initialIncidentId)
+    } else {
+      setActiveTab(initialView)
+    }
+  }, [initialView, initialIncidentId])
 
   useEffect(() => {
     try {
@@ -165,6 +235,15 @@ export const CitizenPortal: React.FC<{
       return
     }
 
+    // Require citizen authentication for incident submission
+    if (!currentUser) {
+      setAuthModalMessage(
+        'Please sign in or create a citizen account to submit your emergency report. This links your incident, ensures secure tracking ownership, and sends official email confirmation.',
+      )
+      setShowAuthModal(true)
+      return
+    }
+
     setSubmitting(true)
     setSubmitError(null)
 
@@ -203,6 +282,7 @@ export const CitizenPortal: React.FC<{
           location: locationName.trim(),
           timestamp: new Date().toISOString(),
         })
+        void refreshMyIncidents()
       }
 
       // Reset form
@@ -312,22 +392,52 @@ export const CitizenPortal: React.FC<{
           >
             <Search size={16} />
             <span>Track Status</span>
-            {savedReports.length > 0 && (
-              <span className="tab-pill">{savedReports.length}</span>
+            {((currentUser ? myIncidents.length : savedReports.length) > 0) && (
+              <span className="tab-pill">
+                {currentUser ? myIncidents.length : savedReports.length}
+              </span>
             )}
           </button>
         </div>
 
-        {onViewMap && (
-          <button
-            type="button"
-            className="citizen-map-link-btn"
-            onClick={onViewMap}
-          >
-            <MapPin size={15} />
-            <span>View Active Map</span>
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {onViewMap && (
+            <button
+              type="button"
+              className="citizen-map-link-btn"
+              onClick={onViewMap}
+            >
+              <MapPin size={15} />
+              <span>View Active Map</span>
+            </button>
+          )}
+
+          <div className="citizen-auth-controls">
+            {currentUser ? (
+              <div className="citizen-user-pill">
+                <div className="citizen-user-avatar">
+                  {currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span className="citizen-user-name">{currentUser.full_name}</span>
+                  <span className="citizen-user-email">{currentUser.email}</span>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="citizen-auth-btn"
+                onClick={() => {
+                  setAuthModalMessage(undefined)
+                  setShowAuthModal(true)
+                }}
+              >
+                <LogIn size={14} />
+                <span>Sign In / Register</span>
+              </button>
+            )}
+          </div>
+        </div>
       </header>
 
       {/* VIEW: HOME GREETING */}
@@ -406,45 +516,128 @@ export const CitizenPortal: React.FC<{
             </div>
           </section>
 
-          {/* Recent Submissions Quick View */}
-          {savedReports.length > 0 && (
-            <section className="recent-submissions-card">
-              <div className="card-header-row">
-                <div className="card-title-group">
-                  <Clock size={16} />
-                  <h3>Your Recent Incident Reports</h3>
+          {/* Authenticated Citizen Personal Incidents Dashboard */}
+          {currentUser ? (
+            <section className="citizen-isolated-dashboard">
+              <div className="citizen-dashboard-header">
+                <div className="citizen-dashboard-title">
+                  <ShieldAlert size={18} style={{ color: '#818cf8' }} />
+                  <h3>Your Emergency Incident Reports</h3>
+                  <span className="citizen-count-badge">
+                    {myIncidents.length} {myIncidents.length === 1 ? 'Incident' : 'Incidents'} • {myIncidents.length} {myIncidents.length === 1 ? 'Personal Report' : 'Personal Reports'}
+                  </span>
                 </div>
-                <span className="text-muted text-sm">Stored locally on this device</span>
+                {loadingIncidents && (
+                  <span className="text-muted text-sm" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <RefreshCw size={13} className="spinner" /> Syncing...
+                  </span>
+                )}
               </div>
 
-              <div className="saved-reports-grid">
-                {savedReports.map((report) => (
-                  <div
-                    key={report.incident_id}
-                    className="saved-report-pill"
-                    onClick={() => {
-                      setSearchId(report.incident_id)
-                      setActiveTab('status')
-                      void handleTrackIncident(report.incident_id)
-                    }}
-                  >
-                    <div className="pill-header">
-                      <span className="pill-id">{report.incident_id}</span>
-                      <span className="pill-time">
-                        {new Date(report.timestamp).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <p className="pill-text">{report.text || 'Incident reported'}</p>
-                    {report.location && (
-                      <span className="pill-loc">
-                        <MapPin size={12} />
-                        {report.location}
-                      </span>
-                    )}
+              {myIncidents.length === 0 ? (
+                <div className="citizen-empty-state-card">
+                  <div className="citizen-empty-icon">
+                    <ShieldAlert size={26} />
                   </div>
-                ))}
-              </div>
+                  <h4>No Incident Reports Submitted Yet</h4>
+                  <p>
+                    Your personal citizen dashboard displays 0 incidents and 0 reports. When you submit an emergency report, its real-time verification status, department routing, and official reference code will appear here securely.
+                  </p>
+                  <button
+                    type="button"
+                    className="citizen-empty-cta"
+                    onClick={() => setActiveTab('report')}
+                  >
+                    <span>Submit Your First Emergency Report</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="citizen-incidents-list">
+                  {myIncidents.map((inc) => {
+                    const incId = inc.incident_id || 'UNKNOWN'
+                    return (
+                      <div
+                        key={incId}
+                        className="citizen-incident-card"
+                        onClick={() => {
+                          if (inc.incident_id) {
+                            setSearchId(inc.incident_id)
+                            setActiveTab('status')
+                            void handleTrackIncident(inc.incident_id)
+                          }
+                        }}
+                        title="Click to track live dispatch status"
+                      >
+                        <div className="citizen-incident-card-top">
+                          <span className="citizen-incident-id">{incId}</span>
+                          <span
+                            className={`citizen-status-badge ${(
+                              inc.verification_status || 'pending'
+                            ).toLowerCase()}`}
+                          >
+                            {inc.verification_status || 'PENDING'}
+                          </span>
+                        </div>
+                        <div className="citizen-incident-type">
+                          {inc.incident_type || 'Crisis Incident'}
+                        </div>
+                        <div className="citizen-incident-meta">
+                          <span className="citizen-incident-location">
+                            <MapPin size={12} />
+                            {inc.location_name || 'Location Not Specified'}
+                          </span>
+                          <span>
+                            {inc.created_at
+                              ? new Date(inc.created_at).toLocaleDateString()
+                              : 'Recently'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </section>
+          ) : (
+            savedReports.length > 0 && (
+              <section className="recent-submissions-card">
+                <div className="card-header-row">
+                  <div className="card-title-group">
+                    <Clock size={16} />
+                    <h3>Your Recent Incident Reports</h3>
+                  </div>
+                  <span className="text-muted text-sm">Stored locally on this device</span>
+                </div>
+
+                <div className="saved-reports-grid">
+                  {savedReports.map((report) => (
+                    <div
+                      key={report.incident_id}
+                      className="saved-report-pill"
+                      onClick={() => {
+                        setSearchId(report.incident_id)
+                        setActiveTab('status')
+                        void handleTrackIncident(report.incident_id)
+                      }}
+                    >
+                      <div className="pill-header">
+                        <span className="pill-id">{report.incident_id}</span>
+                        <span className="pill-time">
+                          {new Date(report.timestamp).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="pill-text">{report.text || 'Incident reported'}</p>
+                      {report.location && (
+                        <span className="pill-loc">
+                          <MapPin size={12} />
+                          {report.location}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )
           )}
         </div>
       )}
@@ -490,6 +683,38 @@ export const CitizenPortal: React.FC<{
                   </span>
                 )}
               </div>
+
+              {/* Submission Email Confirmation Notice */}
+              {submissionResult.email_notification && (
+                <div
+                  className={`email-confirmation-card ${submissionResult.email_notification.status.toLowerCase()}`}
+                >
+                  <Mail size={20} className="email-icon" />
+                  <div className="email-body-text">
+                    <span className="email-title">
+                      {submissionResult.email_notification.status === 'SENT' &&
+                        'Confirmation Email Dispatched'}
+                      {submissionResult.email_notification.status === 'MOCKED' &&
+                        'Confirmation Email Generated (Mock Delivery Active)'}
+                      {submissionResult.email_notification.status === 'FAILED' &&
+                        'Confirmation Email Notice'}
+                      {submissionResult.email_notification.status === 'SKIPPED' &&
+                        'Email Notice'}
+                    </span>
+                    <span className="email-subtext">
+                      {submissionResult.email_notification.status === 'SENT' &&
+                        `An official confirmation email with Reference ID ${submissionResult.incident_id} and a direct tracking link has been sent to ${submissionResult.email_notification.recipient}.`}
+                      {submissionResult.email_notification.status === 'MOCKED' &&
+                        `A confirmation email with tracking link was generated for ${submissionResult.email_notification.recipient}. (Live Gmail SMTP credentials pending from team; email saved in server mock outbox).`}
+                      {submissionResult.email_notification.status === 'FAILED' &&
+                        `Incident submitted successfully, but automated email delivery failed (${submissionResult.email_notification.error || 'SMTP delivery issue'}). Please keep your Reference ID handy.`}
+                      {submissionResult.email_notification.status === 'SKIPPED' &&
+                        (submissionResult.email_notification.message ||
+                          'No registered citizen email account was linked.')}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Conflicting Evidence Alert */}
               {(submissionResult.has_conflict ||
@@ -907,32 +1132,67 @@ export const CitizenPortal: React.FC<{
           </div>
 
           {/* Stored Reports Quick Chips */}
-          {savedReports.length > 0 && (
+          {((currentUser && myIncidents.length > 0) || (!currentUser && savedReports.length > 0)) && (
             <div className="saved-chips-bar">
-              <span className="chips-label">Recent Submissions:</span>
-              {savedReports.map((r) => (
+              <span className="chips-label">Your Submissions:</span>
+              {(currentUser && myIncidents.length > 0
+                ? myIncidents
+                    .filter((inc): inc is Incident & { incident_id: string } => Boolean(inc.incident_id))
+                    .map((inc) => ({
+                      incident_id: inc.incident_id,
+                      status: inc.verification_status,
+                    }))
+                : savedReports.map((r) => ({
+                    incident_id: r.incident_id,
+                    status: undefined,
+                  }))
+              ).map((item) => (
                 <button
-                  key={r.incident_id}
+                  key={item.incident_id}
                   type="button"
-                  className={`chip-button ${searchId === r.incident_id ? 'active' : ''}`}
+                  className={`chip-button ${searchId === item.incident_id ? 'active' : ''}`}
                   onClick={() => {
-                    setSearchId(r.incident_id)
-                    void handleTrackIncident(r.incident_id)
+                    setSearchId(item.incident_id)
+                    void handleTrackIncident(item.incident_id)
                   }}
                 >
-                  <span>{r.incident_id.slice(0, 12)}…</span>
+                  <span>{item.incident_id.slice(0, 12)}…</span>
+                  {item.status && (
+                    <span style={{ fontSize: '10px', opacity: 0.8, marginLeft: '4px' }}>
+                      ({item.status})
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
           )}
 
           {trackingError && (
-            <div className="form-error-alert">
-              <AlertCircle size={18} />
-              <div>
+            <div className="form-error-alert" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={18} />
                 <strong>Lookup Notice</strong>
-                <p>{trackingError}</p>
               </div>
+              <p style={{ margin: '4px 0 0 0' }}>{trackingError}</p>
+              {!currentUser && (
+                <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', width: '100%' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>
+                    Submitted this incident? Citizen incident records are private. Sign in with your registered account to view your submission details.
+                  </p>
+                  <button
+                    type="button"
+                    className="citizen-auth-btn"
+                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                    onClick={() => {
+                      setAuthModalMessage('Sign in to view your submitted incident.')
+                      setShowAuthModal(true)
+                    }}
+                  >
+                    <LogIn size={13} />
+                    <span>Sign In to View Private Incident</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1123,6 +1383,20 @@ export const CitizenPortal: React.FC<{
           )}
         </div>
       )}
+
+      {/* Citizen Authentication Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={(user) => {
+          setCurrentUser(user)
+          setShowAuthModal(false)
+          if (searchId.trim()) {
+            void handleTrackIncident(searchId.trim())
+          }
+        }}
+        message={authModalMessage}
+      />
     </div>
   )
 }
