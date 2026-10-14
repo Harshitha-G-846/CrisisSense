@@ -30,6 +30,20 @@ def generate_revised_plan(
         incident=incident,
     )
 
+    if recommendations is not None:
+        recommendations["is_synthetic"] = True
+        recommendations["availability_is_simulated"] = True
+        recommendations["dataset_version"] = "crisissense-synth-v1.0"
+        recommendations["dataset_label"] = "SIMULATED RESOURCES — DEMO DATA"
+        recommendations["simulation_notice"] = (
+            "Demonstration data only. Resource coordinates and availability states "
+            "are synthetically generated and must not be treated as live operational assets."
+        )
+        for rec in recommendations.get("recommendations", []):
+            for cand in rec.get("candidates", []):
+                cand["is_synthetic"] = True
+                cand["availability_is_simulated"] = True
+
     incident.response_status = "PLANNED"
 
     db.commit()

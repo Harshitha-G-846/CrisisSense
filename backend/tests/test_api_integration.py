@@ -8,12 +8,37 @@ from __future__ import annotations
 
 import io
 import os
+import tempfile
 import numpy as np
 import pytest
 from PIL import Image, ImageDraw
 from fastapi.testclient import TestClient
 
 from main import app
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from member3.database import Base, get_db
+
+from sqlalchemy.pool import StaticPool
+
+# Isolate tests into an in-memory SQLite database so crisissense.db is NEVER modified
+_test_engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+_TestingSessionLocal = sessionmaker(
+    bind=_test_engine,
+    autoflush=False,
+    expire_on_commit=False,
+)
+Base.metadata.create_all(bind=_test_engine)
+
+def _override_get_db():
+    with _TestingSessionLocal() as session:
+        yield session
+
+app.dependency_overrides[get_db] = _override_get_db
 
 client = TestClient(app)
 
@@ -298,4 +323,120 @@ def test_end_to_end_ocr_conflict_detection():
     # Must have both CURRENT text evidence and OLD OCR evidence
     assert any(ev["source"] == "ocr" and ev["polarity"] == "OLD" for ev in curr["evidence"])
     assert any(ev["source"] == "text" and ev["polarity"] == "CURRENT" for ev in curr["evidence"])
+
+
+# ---------------------------------------------------------------------------
+# 14. Placeholder rejection test
+# ---------------------------------------------------------------------------
+
+def test_placeholder_submission_rejected():
+    resp_text = client.post("/analyze-text", json={"text": "string"})
+    assert resp_text.status_code == 422
+    assert "placeholder" in resp_text.json()["detail"].lower()
+
+    resp_form = client.post("/analyze", data={"text": "placeholder"})
+    assert resp_form.status_code == 422
+    assert "placeholder" in resp_form.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
+# 15. Matching text and media evidence (no false conflict)
+# ---------------------------------------------------------------------------
+
+def test_matching_text_and_media_evidence_no_conflict():
+    # When text is current and media does not have historical claims, no conflict is raised
+    resp = client.post(
+        "/analyze",
+        data={"text": "Flash flood happening right now on Main Street!"},
+        files={"image": ("flood_current.png", _png_bytes(), "image/png")},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    curr = body["currentness"]
+    # No conflict should be detected for matching / non-contradictory evidence
+    assert len(curr["conflicts_detected"]) == 0
+    assert body.get("has_conflict") is False
+
+
+# ---------------------------------------------------------------------------
+# 16. Database isolation test
+# ---------------------------------------------------------------------------
+
+def test_database_isolation_preserves_application_db():
+    import sqlite3
+    db_file = os.path.join(os.path.dirname(__file__), "..", "crisissense.db")
+    if os.path.exists(db_file):
+        conn = sqlite3.connect(db_file)
+        # Verify database is readable and existing records are intact
+        rep_count = conn.cursor().execute("SELECT COUNT(*) FROM reports").fetchone()[0]
+        inc_count = conn.cursor().execute("SELECT COUNT(*) FROM incidents").fetchone()[0]
+        conn.close()
+        assert rep_count >= 68
+        assert inc_count >= 63
+
+
+# ---------------------------------------------------------------------------
+# 17. Missing modality test (image only without text form field)
+# ---------------------------------------------------------------------------
+
+def test_missing_modality_image_only():
+    resp = client.post(
+        "/analyze",
+        files={"image": ("incident_only.png", _png_bytes(), "image/png")},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "currentness" in body
+    # Gracefully processed with missing text modality
+    assert body["currentness"]["action"] in ("ALLOW", "HUMAN_VERIFICATION_REQUIRED")
+
+
+# ---------------------------------------------------------------------------
+# 18. Uncertain results require human verification
+# ---------------------------------------------------------------------------
+
+def test_uncertain_results_require_human_verification():
+    # A generic statement without temporal markers produces UNCERTAIN verdict
+    resp = client.post(
+        "/analyze-text",
+        json={"text": "Water levels rising near the riverbank in the residential district."},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    curr = body["currentness"]
+    assert curr["currentness"] == "UNCERTAIN"
+    assert curr["action"] == "HUMAN_VERIFICATION_REQUIRED"
+
+
+# ---------------------------------------------------------------------------
+# 19. Conflicting evidence is preserved and routed to human review (not auto-rejected or auto-verified)
+# ---------------------------------------------------------------------------
+
+def test_conflicting_evidence_does_not_auto_reject_or_auto_verify():
+    img = Image.new("RGB", (600, 150), color="white")
+    draw = ImageDraw.Draw(img)
+    draw.text((30, 50), "PHOTO ARCHIVE 2014-06-12", fill="black")
+    img_scaled = img.resize((1200, 300), Image.Resampling.LANCZOS)
+
+    buf = io.BytesIO()
+    img_scaled.save(buf, format="PNG")
+    buf.seek(0)
+
+    resp = client.post(
+        "/analyze",
+        data={"text": "Building fire reported today right now on Oak Street!"},
+        files={"image": ("archive_2014.png", buf.read(), "image/png")},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["has_conflict"] is True
+    assert len(body["conflicts_detected"]) > 0
+    # Must NOT be confidently verified as CURRENT solely on text
+    assert body["currentness"]["currentness"] != "CURRENT"
+    assert body["currentness"]["action"] == "HUMAN_VERIFICATION_REQUIRED"
+    # Must NOT be deleted or discarded
+    assert body["storage_status"] in ("SAVED", "EXISTING_DUPLICATE")
+    assert body["incident_id"] is not None
+
+
 

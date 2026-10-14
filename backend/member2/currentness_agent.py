@@ -161,7 +161,7 @@ def run_currentness_verification(
         video_evidence = extract_video_evidence(
             video_path=video_path,
             reference_date=ref_date,
-            max_frames=3,
+            max_frames=5,
             ocr_text_override_per_frame=video_ocr_override_per_frame,
         )
         all_evidence.extend(video_evidence)
@@ -170,7 +170,7 @@ def run_currentness_verification(
         if is_model_available():
             try:
                 from .video import sample_video_frames
-                for frame in sample_video_frames(video_path, max_frames=3):
+                for frame in sample_video_frames(video_path, max_frames=5):
                     visual_items = classify_image(
                         frame["image"],
                         reference_date=ref_date,
@@ -189,7 +189,7 @@ def run_currentness_verification(
 
         # Perceptual reuse detection on sampled video frames if reuse corpus is provided
         if reuse_corpus is not None and len(reuse_corpus) > 0:
-            sampled_frames = sample_video_frames(video_path=video_path, max_frames=3)
+            sampled_frames = sample_video_frames(video_path=video_path, max_frames=5)
             if sampled_frames:
                 frame_reuse_items = check_video_frames_reuse(
                     frames=sampled_frames,

@@ -101,6 +101,35 @@ ALLOW_CONFIDENCE_THRESHOLD: float = 0.55
 # Hard cap on the total score contribution from REUSE sources
 REUSE_MAX_CONTRIBUTION: float = 0.35
 
+# Calibrated confidence threshold for visual classifications to trigger cross-modal conflict
+CATEGORY_CONFLICT_THRESHOLD: float = 0.70
+
+# Semantic compatibility between visual classification predictions
+# and Member 1 NLP incident categories (normalized lowercase).
+CATEGORY_COMPATIBILITY: Dict[str, Set[str]] = {
+    "earthquake": {
+        "earthquake", "building collapse", "landslide",
+        "industrial / structural accident", "tsunami", "environmental condition / other", "other"
+    },
+    "flood": {
+        "flood", "urban flood", "heavy rain", "cyclone", "tsunami",
+        "thunderstorm", "hailstorm", "landslide", "environmental condition / other", "other"
+    },
+    "fire": {
+        "fire", "forest fire", "industrial / structural accident", "building collapse",
+        "lightning", "environmental condition / other", "other"
+    },
+    "smoke": {
+        "fire", "forest fire", "industrial / structural accident", "air pollution / smog",
+        "dust storm", "building collapse", "environmental condition / other", "other"
+    },
+    "landslide": {
+        "landslide", "avalanche", "earthquake", "flood", "urban flood",
+        "heavy rain", "cyclone", "building collapse", "environmental condition / other", "other"
+    },
+}
+COMPATIBLE_INCIDENT_TYPES = CATEGORY_COMPATIBILITY
+
 # Source reliability multipliers.
 # Heuristic starting points; calibration scheduled for Phase 11:
 #   TEXT / OCR       — explicit human-readable temporal claims; high reliability.
@@ -188,24 +217,86 @@ def _score(
 # Conflict detection
 # ---------------------------------------------------------------------------
 
+def detect_category_conflicts(
+    evidence: List[EvidenceItem],
+    member1_context: Optional[Member1Context] = None,
+) -> List[str]:
+    """
+    Detects cross-modal contradictions between Citizen text NLP incident category
+    and high-confidence visual evidence (image/video frame classifications).
+    """
+    if not member1_context or not member1_context.incident_type:
+        return []
+
+    text_type = member1_context.incident_type.strip().lower()
+    if not text_type or text_type in ("unknown", "other"):
+        return []
+
+    conflicts: List[str] = []
+    seen_visual_classes: Set[str] = set()
+
+    for item in evidence:
+        is_visual = (
+            item.source in (
+                EvidenceSource.IMAGE_CLASSIFICATION,
+                EvidenceSource.IMAGE_NORMAL_CLASSIFICATION,
+                EvidenceSource.VIDEO,
+            )
+            or (item.details and "predicted_class" in item.details)
+        )
+        if not is_visual or not item.details:
+            continue
+
+        pred_class = str(item.details.get("predicted_class") or "").strip().lower()
+        if not pred_class or pred_class in seen_visual_classes:
+            continue
+
+        confidence = float(item.details.get("confidence") or item.weight or 0.0)
+        if confidence < CATEGORY_CONFLICT_THRESHOLD:
+            continue
+
+        compatible_types = CATEGORY_COMPATIBILITY.get(pred_class)
+        if compatible_types is not None and text_type not in compatible_types:
+            seen_visual_classes.add(pred_class)
+            source_label = (
+                f"Video frame {item.details['frame_index']} visual classifier"
+                if "frame_index" in item.details
+                else "Image visual classifier"
+            )
+            conflicts.append(
+                f"Cross-modal category conflict: Citizen text indicates '{member1_context.incident_type}' "
+                f"(source: Citizen text NLP) while visual evidence indicates '{pred_class.title()}' "
+                f"(source: {source_label}, confidence: {confidence:.1%}). "
+                f"Incompatible incident categories: {text_type.title()} contradicts {pred_class.title()}. "
+                f"Human verification is required."
+            )
+
+    return conflicts
+
+
 def detect_conflicts(
     evidence: List[EvidenceItem],
     current_score: float,
     old_score: float,
+    member1_context: Optional[Member1Context] = None,
 ) -> List[str]:
     """
     Returns a list of human-readable conflict descriptions.
 
-    Conflict is raised when BOTH current_score and old_score exceed
-    CONFLICT_THRESHOLD, i.e., there is meaningful evidence on both sides.
-    Additional specific cross-source contradictions are also inspected:
-      - METADATA OLD vs TEXT/OCR CURRENT
-      - REUSE OLD vs strong CURRENT claims (TEXT, OCR, AUDIO)
+    Conflict is raised when:
+      - Cross-modal category contradiction between text NLP and high-confidence visual classification
+      - BOTH current_score and old_score exceed CONFLICT_THRESHOLD
+      - Cross-source temporal contradictions (METADATA OLD vs TEXT/OCR CURRENT, REUSE OLD vs strong CURRENT)
 
     Absence of evidence is NEVER treated as a conflict.
     """
     conflicts: List[str] = []
 
+    # 1. Cross-modal category contradiction (text category vs visual evidence category)
+    category_conflicts = detect_category_conflicts(evidence, member1_context)
+    conflicts.extend(category_conflicts)
+
+    # 2. Directional temporal conflict
     if current_score >= CONFLICT_THRESHOLD and old_score >= CONFLICT_THRESHOLD:
         conflicts.append(
             f"Directional conflict: CURRENT score {current_score:.3f} and OLD score "
@@ -213,7 +304,7 @@ def detect_conflicts(
             f"Evidence supports both currentness and historical origin."
         )
 
-    # Check for METADATA vs TEXT/OCR conflict at item level
+    # 3. Check for METADATA vs TEXT/OCR conflict at item level
     meta_old = [
         i for i in evidence
         if i.source == EvidenceSource.METADATA
@@ -231,7 +322,7 @@ def detect_conflicts(
             "Metadata indicates OLD origin while text/OCR claims CURRENT activity."
         )
 
-    # Meaningful reuse evidence conflicting with strong CURRENT claim
+    # 4. Meaningful reuse evidence conflicting with strong CURRENT claim
     reuse_old = [
         i for i in evidence
         if i.source == EvidenceSource.REUSE
@@ -267,10 +358,9 @@ def _calculate_confidence(
     """
     Heuristic, deterministic confidence in [0.0, 1.0].
 
-    - No directional evidence (empty or neutral-only) -> 0.0
-    - UNCERTAIN:
-        - With conflicts: 0.10 - 0.20 (penalised by conflict count)
-        - Without conflicts: 0.30
+    - If conflicts exist: 0.10 - 0.20 (penalised by conflict count)
+    - No directional evidence (empty or neutral-only without conflict) -> 0.0
+    - UNCERTAIN without conflicts -> 0.30
     - CURRENT / OLD:
         - Winning fraction scaled to [0.40, 0.90] based on dominance.
         - Clamped to 0.93 max to avoid false precision.
@@ -278,13 +368,14 @@ def _calculate_confidence(
     This is an uncalibrated heuristic confidence score, NOT a statistical
     probability. Formal calibration is scheduled for Phase 11.
     """
+    if conflicts:
+        penalty = 0.05 * min(len(conflicts), 3)
+        return round(max(0.10, 0.25 - penalty), 4)
+
     if not has_directional:
         return 0.0
 
     if verdict == CurrentnessVerdict.UNCERTAIN:
-        if conflicts:
-            penalty = 0.05 * min(len(conflicts), 3)
-            return round(max(0.10, 0.25 - penalty), 4)
         return 0.30
 
     winning_score = current_score if verdict == CurrentnessVerdict.CURRENT else old_score
@@ -366,6 +457,7 @@ def fuse_evidence(
             evidence=[],
             conflicts_detected=[],
             member1_context=member1_context,
+            has_conflict=False,
         )
 
     # Filter out any None items defensively
@@ -378,6 +470,7 @@ def fuse_evidence(
             evidence=[],
             conflicts_detected=[],
             member1_context=member1_context,
+            has_conflict=False,
         )
 
     # 2. Score each polarity
@@ -391,16 +484,21 @@ def fuse_evidence(
     has_directional = len(directional_items) > 0 and (current_score > 0.0 or old_score > 0.0)
     directional_sources: Set[EvidenceSource] = {i.source for i in directional_items}
 
-    # 3. Detect conflicts (absence of evidence is never a conflict)
-    conflicts = detect_conflicts(valid_evidence, current_score, old_score) if has_directional else []
+    # 3. Detect conflicts (temporal contradictions AND cross-modal category contradictions)
+    conflicts = detect_conflicts(
+        valid_evidence,
+        current_score=current_score,
+        old_score=old_score,
+        member1_context=member1_context,
+    )
 
     # 4. Verdict precedence rules
-    if not has_directional:
-        # No directional evidence at all (empty or only NEUTRAL items)
+    if conflicts:
+        # Meaningful conflict (cross-modal category contradiction or temporal conflict)
         verdict = CurrentnessVerdict.UNCERTAIN
 
-    elif conflicts:
-        # Meaningful conflict between CURRENT and OLD evidence
+    elif not has_directional:
+        # No directional evidence at all (empty or only NEUTRAL items)
         verdict = CurrentnessVerdict.UNCERTAIN
 
     elif directional_sources == {EvidenceSource.REFERENCE_CORPUS}:
@@ -436,4 +534,5 @@ def fuse_evidence(
         evidence=valid_evidence,
         conflicts_detected=conflicts,
         member1_context=member1_context,
+        has_conflict=len(conflicts) > 0,
     )

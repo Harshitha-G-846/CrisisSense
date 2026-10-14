@@ -57,7 +57,7 @@ def get_video_metadata(video_path: Union[str, os.PathLike]) -> Dict[str, Any]:
 
 def sample_video_frames(
     video_path: Union[str, os.PathLike],
-    max_frames: int = 3
+    max_frames: int = 5
 ) -> List[Dict[str, Any]]:
     """
     Deterministically samples a small subset of representative frames in-memory
@@ -87,7 +87,6 @@ def sample_video_frames(
         elif max_frames == 2:
             target_indices = [0, total_frames - 1]
         else:
-            # e.g., for max_frames=3: [0, total_frames // 2, total_frames - 1]
             step = (total_frames - 1) / (max_frames - 1)
             target_indices = sorted(list({int(round(i * step)) for i in range(max_frames)}))
 
@@ -119,13 +118,13 @@ def sample_video_frames(
 def extract_video_evidence(
     video_path: Union[str, os.PathLike],
     reference_date: Optional[date] = None,
-    max_frames: int = 3,
+    max_frames: int = 5,
     ocr_text_override_per_frame: Optional[Dict[int, str]] = None
 ) -> List[EvidenceItem]:
     """
     Extracts multimodal currentness evidence from a video file:
     1. Video structure metadata (duration, resolution, frame rate).
-    2. Visual OCR temporal evidence from representative in-memory frames.
+    2. Visual OCR temporal and textual evidence from representative in-memory frames.
     """
     if reference_date is None:
         reference_date = datetime.now(timezone.utc).date()
@@ -163,6 +162,7 @@ def extract_video_evidence(
     # Sample representative frames
     sampled_frames = sample_video_frames(video_path, max_frames=max_frames)
     ocr_evidence_items: List[EvidenceItem] = []
+    engine_unavailable = False
 
     for item in sampled_frames:
         frame_idx = item["frame_index"]
@@ -181,8 +181,13 @@ def extract_video_evidence(
         )
 
         for ev in frame_ocr_evidence:
-            if ev.polarity in (EvidencePolarity.CURRENT, EvidencePolarity.OLD):
-                # Enhance description with frame provenance
+            st = (ev.details or {}).get("status")
+            if st == "UNAVAILABLE":
+                engine_unavailable = True
+
+            # Preserve items that have directional temporal claims OR meaningful extracted text
+            has_extracted_text = bool((ev.details or {}).get("ocr_text"))
+            if ev.polarity in (EvidencePolarity.CURRENT, EvidencePolarity.OLD) or has_extracted_text:
                 ev.finding = f"Video frame {frame_idx} (t={ts_sec}s): {ev.finding}"
                 if ev.details is not None:
                     ev.details["frame_index"] = frame_idx
@@ -191,6 +196,16 @@ def extract_video_evidence(
 
     if ocr_evidence_items:
         evidence.extend(ocr_evidence_items)
+    elif engine_unavailable:
+        evidence.append(
+            EvidenceItem(
+                source=EvidenceSource.OCR,
+                finding="OCR engine unavailable across video frames (Tesseract binary missing)",
+                polarity=EvidencePolarity.NEUTRAL,
+                weight=0.0,
+                details={"sampled_frame_count": len(sampled_frames), "status": "UNAVAILABLE"}
+            )
+        )
     else:
         evidence.append(
             EvidenceItem(
@@ -198,7 +213,7 @@ def extract_video_evidence(
                 finding="No temporal claims detected across sampled video frames",
                 polarity=EvidencePolarity.NEUTRAL,
                 weight=0.20,
-                details={"sampled_frame_count": len(sampled_frames)}
+                details={"sampled_frame_count": len(sampled_frames), "status": "EXECUTED_NO_TEXT"}
             )
         )
 

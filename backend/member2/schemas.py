@@ -70,3 +70,7 @@ class CurrentnessResult(BaseModel):
         description="List of detected contradiction descriptions between evidence items"
     )
     member1_context: Optional[Member1Context] = None
+    has_conflict: bool = Field(
+        default=False,
+        description="True if any cross-modal or temporal conflicts were detected"
+    )

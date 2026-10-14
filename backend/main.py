@@ -21,20 +21,25 @@ from typing import Literal
 from fastapi import Query
 from member3.models import Resource
 from member3.resource_service import recommend_resources
-from datetime import timezone
+from datetime import timedelta, timezone
 from member3.models import utc_now
 
 import os
 import tempfile
 from typing import Optional
-
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from member1.pipeline import analyze_crisis
+import member1.pipeline as _m1_pipe
+if hasattr(_m1_pipe, "crisis_model") and not hasattr(_m1_pipe.crisis_model, "multi_class"):
+    _m1_pipe.crisis_model.multi_class = "auto"
+
 from member2.currentness_agent import run_currentness_verification
 from member2.schemas import Member1Context
+from member2.fusion import CATEGORY_COMPATIBILITY, CATEGORY_CONFLICT_THRESHOLD
 
 from member4.authorization_service import authorize_response
 from member4.schemas import VerificationRequest, FeedbackRequest
@@ -58,6 +63,18 @@ app = FastAPI(
     version="2.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -80,6 +97,22 @@ def _validate_ext(filename: Optional[str], allowed: set, label: str) -> None:
                 f"Allowed: {sorted(allowed)}"
             ),
         )
+_PLACEHOLDER_SUBMISSIONS = {
+    "string",
+    "placeholder",
+    "n/a",
+    "none",
+    "null",
+    "undefined",
+    "sample",
+    "demo",
+}
+
+
+def _is_placeholder_text(t: Optional[str]) -> bool:
+    if not t:
+        return False
+    return t.strip().lower() in _PLACEHOLDER_SUBMISSIONS
 
 
 def _save_upload(upload: UploadFile, suffix: str) -> str:
@@ -105,10 +138,12 @@ def _build_member1_context(m1: dict) -> Member1Context:
 
 def _format_currentness(result) -> dict:
     """Serialise CurrentnessResult to a plain dict for the JSON response."""
+    has_conflict = getattr(result, "has_conflict", False) or bool(result.conflicts_detected)
     return {
         "currentness": result.currentness.value,
         "confidence": result.confidence,
         "action": result.action.value,
+        "has_conflict": has_conflict,
         "conflicts_detected": result.conflicts_detected,
         "evidence": [
             {
@@ -121,6 +156,65 @@ def _format_currentness(result) -> dict:
             for ev in result.evidence
         ],
     }
+
+
+def _get_report_conflicts(report: Report) -> list[str]:
+    """
+    Returns detected conflicts from stored currentness assessment, or dynamically
+    reconstructs category conflicts if not present in stored JSON.
+    """
+    conflicts: list[str] = []
+    curr = report.currentness_assessment or {}
+    stored_conflicts = curr.get("conflicts_detected")
+    if stored_conflicts:
+        conflicts.extend(stored_conflicts)
+        return conflicts
+
+    # Dynamic reconstruction for historical records
+    m1 = report.crisis_analysis or {}
+    text_type = str(m1.get("incident_type") or "").strip().lower()
+    if not text_type or text_type in ("unknown", "other"):
+        return conflicts
+
+    evidence = curr.get("evidence") or []
+    seen_visual_classes: set[str] = set()
+
+    for item in evidence:
+        details = item.get("details") or {}
+        source = item.get("source", "")
+        is_visual = (
+            "classification" in source
+            or source == "video"
+            or "predicted_class" in details
+        )
+        if not is_visual or not details:
+            continue
+
+        pred_class = str(details.get("predicted_class") or "").strip().lower()
+        if not pred_class or pred_class in seen_visual_classes:
+            continue
+
+        confidence = float(details.get("confidence") or item.get("weight") or 0.0)
+        if confidence < CATEGORY_CONFLICT_THRESHOLD:
+            continue
+
+        compatible_types = CATEGORY_COMPATIBILITY.get(pred_class)
+        if compatible_types is not None and text_type not in compatible_types:
+            seen_visual_classes.add(pred_class)
+            source_label = (
+                f"Video frame {details['frame_index']} visual classifier"
+                if "frame_index" in details
+                else "Image visual classifier"
+            )
+            conflicts.append(
+                f"Cross-modal category conflict: Citizen text indicates '{m1.get('incident_type')}' "
+                f"(source: Citizen text NLP) while visual evidence indicates '{pred_class.title()}' "
+                f"(source: {source_label}, confidence: {confidence:.1%}). "
+                f"Incompatible incident categories: {text_type.title()} contradicts {pred_class.title()}. "
+                f"Human verification is required."
+            )
+
+    return conflicts
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +307,12 @@ def analyze_text(
             detail="Report text cannot be empty.",
         )
 
+    if _is_placeholder_text(request.text):
+        raise HTTPException(
+            status_code=422,
+            detail="Report text cannot be a default placeholder ('string', 'test', etc.). Please provide a genuine incident description.",
+        )
+
     # Member 1: identify crisis details.
     m1_result = analyze_crisis(request.text)
     m1_context = _build_member1_context(m1_result)
@@ -223,6 +323,26 @@ def analyze_text(
         member1_context=m1_context,
     )
     currentness_data = _format_currentness(currentness_result)
+
+    # Idempotency / duplicate protection: check if an identical report was submitted within 5 minutes
+    cutoff = utc_now() - timedelta(minutes=5)
+    recent_duplicate = db.scalars(
+        select(Report)
+        .where(Report.original_text == request.text, Report.received_at >= cutoff)
+        .order_by(Report.received_at.desc())
+    ).first()
+
+    if recent_duplicate is not None:
+        return {
+            "report_id": recent_duplicate.id,
+            "incident_id": recent_duplicate.incident_id,
+            "storage_status": "EXISTING_DUPLICATE",
+            "crisis_analysis": m1_result,
+            "currentness": currentness_data,
+            "is_duplicate": True,
+            "has_conflict": len(currentness_data.get("conflicts_detected", [])) > 0,
+            "conflicts_detected": currentness_data.get("conflicts_detected", []),
+        }
 
     # Member 3: preserve the original text and both outputs.
     report = save_report(
@@ -237,8 +357,11 @@ def analyze_text(
     return {
         "report_id": report.id,
         "incident_id": report.incident_id,
+        "storage_status": "SAVED",
         "crisis_analysis": m1_result,
         "currentness": currentness_data,
+        "has_conflict": len(currentness_data.get("conflicts_detected", [])) > 0,
+        "conflicts_detected": currentness_data.get("conflicts_detected", []),
     }
 
 
@@ -274,6 +397,13 @@ async def analyze(
         raise HTTPException(
             status_code=422,
             detail="At least one modality is required: text, image, video, or audio.",
+        )
+
+    # Reject text-only placeholder submissions
+    if has_text and not (has_image or has_video or has_audio) and _is_placeholder_text(text):
+        raise HTTPException(
+            status_code=422,
+            detail="Report text cannot be a default placeholder ('string', 'test', etc.). Please provide a genuine incident description.",
         )
 
     # Validate file extensions before saving anything
@@ -335,11 +465,13 @@ async def analyze(
             try:
                 from member2.video import sample_video_frames
                 from member2.ocr import extract_ocr_text
-                frames = sample_video_frames(video_path, max_frames=3)
+                frames = sample_video_frames(video_path, max_frames=5)
                 for frame in frames:
                     frame_ocr = extract_ocr_text(frame["image"])
                     if frame_ocr and frame_ocr.strip():
-                        combined_text_parts.append(frame_ocr.strip())
+                        trimmed = frame_ocr.strip()
+                        if trimmed not in combined_text_parts:
+                            combined_text_parts.append(trimmed)
             except Exception as exc:
                 print(f"[analyze] Video OCR extraction failed: {exc}")
 
@@ -394,18 +526,31 @@ async def analyze(
     # Persist any submission that produced usable text —
     # whether from a form field, OCR, ASR, or a combination.
     if combined_text:
-        report = save_report(
-            db=db,
-            original_text=combined_text,
-            crisis_analysis=m1_result,
-            currentness_assessment=currentness_data,
-        )
+        # Idempotency / duplicate protection: check if identical text was submitted within the last 5 minutes
+        cutoff = utc_now() - timedelta(minutes=5)
+        recent_duplicate = db.scalars(
+            select(Report)
+            .where(Report.original_text == combined_text, Report.received_at >= cutoff)
+            .order_by(Report.received_at.desc())
+        ).first()
 
-        create_incident_from_report(db=db, report=report)
+        if recent_duplicate is not None:
+            report_id = recent_duplicate.id
+            incident_id = recent_duplicate.incident_id
+            storage_status = "EXISTING_DUPLICATE"
+        else:
+            report = save_report(
+                db=db,
+                original_text=combined_text,
+                crisis_analysis=m1_result,
+                currentness_assessment=currentness_data,
+            )
 
-        report_id = report.id
-        incident_id = report.incident_id
-        storage_status = "SAVED"
+            create_incident_from_report(db=db, report=report)
+
+            report_id = report.id
+            incident_id = report.incident_id
+            storage_status = "SAVED"
 
     return {
         "report_id": report_id,
@@ -413,6 +558,8 @@ async def analyze(
         "storage_status": storage_status,
         "crisis_analysis": m1_result,
         "currentness": currentness_data,
+        "has_conflict": currentness_data.get("has_conflict", False) or len(currentness_data.get("conflicts_detected", [])) > 0,
+        "conflicts_detected": currentness_data.get("conflicts_detected", []),
     }
 
 @app.get("/incidents")
@@ -429,6 +576,15 @@ def list_incidents(db: Session = Depends(get_db)):
 
     rows = db.execute(statement).all()
 
+    # Query all reports to determine conflict presence (stored or reconstructed)
+    all_reports = db.scalars(
+        select(Report).where(Report.incident_id.isnot(None))
+    ).all()
+    conflict_report_incidents = set()
+    for rep in all_reports:
+        if _get_report_conflicts(rep):
+            conflict_report_incidents.add(rep.incident_id)
+
     return [
         {
             "incident_id": incident.id,
@@ -441,6 +597,7 @@ def list_incidents(db: Session = Depends(get_db)):
             "status": incident.status,
             "verification_status": incident.verification_status,
             "report_count": report_count,
+            "has_conflict": incident.id in conflict_report_incidents,
             "created_at": utc_timestamp(incident.created_at),
             "updated_at": utc_timestamp(incident.updated_at),
         }
@@ -574,6 +731,31 @@ def incident_details(
         .order_by(Report.received_at, Report.id)
     ).all()
 
+    all_conflicts = []
+    formatted_reports = []
+    for report in reports:
+        report_conflicts = _get_report_conflicts(report)
+        for c in report_conflicts:
+            if c not in all_conflicts:
+                all_conflicts.append(c)
+
+        curr_dict = dict(report.currentness_assessment or {})
+        if report_conflicts:
+            curr_dict["conflicts_detected"] = report_conflicts
+            curr_dict["has_conflict"] = True
+        else:
+            curr_dict["has_conflict"] = curr_dict.get("has_conflict", False)
+
+        formatted_reports.append({
+            "report_id": report.id,
+            "original_text": report.original_text,
+            "crisis_analysis": report.crisis_analysis,
+            "currentness": curr_dict,
+            "received_at": utc_timestamp(report.received_at),
+        })
+
+    has_conflict = len(all_conflicts) > 0
+
     return {
         "incident_id": incident.id,
         "incident_type": incident.incident_type,
@@ -584,19 +766,12 @@ def incident_details(
         "needs": incident.needs,
         "status": incident.status,
         "verification_status": incident.verification_status,
+        "has_conflict": has_conflict,
+        "conflicts_detected": all_conflicts,
         "created_at": utc_timestamp(incident.created_at),
         "updated_at": utc_timestamp(incident.updated_at),
         "report_count": len(reports),
-        "reports": [
-            {
-                "report_id": report.id,
-                "original_text": report.original_text,
-                "crisis_analysis": report.crisis_analysis,
-                "currentness": report.currentness_assessment,
-                "received_at": utc_timestamp(report.received_at),
-            }
-            for report in reports
-        ],
+        "reports": formatted_reports,
     }
 
 class IncidentStatusUpdate(BaseModel):

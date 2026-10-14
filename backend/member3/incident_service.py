@@ -21,7 +21,22 @@ def find_duplicate_incident(
         return None
 
     locations = analysis.get("locations") or []
-    location = locations[0] if locations else {}
+
+    location_priority = {
+        "locality": 4,
+        "city": 3,
+        "unknown": 2,
+        "state": 1,
+    }
+
+    location = max(
+        locations,
+        key=lambda item: location_priority.get(
+            str(item.get("location_type") or "unknown").lower(),
+            0,
+        ),
+        default={},
+    )
 
     cutoff = report.received_at - timedelta(hours=24)
 
@@ -146,7 +161,22 @@ def create_incident_from_report(
         return existing_incident
 
     locations = analysis.get("locations") or []
-    location = locations[0] if locations else {}
+
+    location_priority = {
+        "locality": 4,
+        "city": 3,
+        "unknown": 2,
+        "state": 1,
+    }
+
+    location = max(
+        locations,
+        key=lambda item: location_priority.get(
+            str(item.get("location_type") or "unknown").lower(),
+            0,
+        ),
+        default={},
+    )
 
     incident = Incident(
         incident_type=analysis.get("incident_type") or "Unknown",
