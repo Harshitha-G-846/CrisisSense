@@ -3,66 +3,80 @@
    ========================================================================== */
 
 :root {
-  /* Surface Tokens (Refined Dark Glassmorphism) */
-  --bg-primary: #0a0c10;
-  --bg-surface: rgba(18, 22, 31, 0.75);
-  --bg-surface-elevated: rgba(26, 32, 44, 0.85);
-  --bg-surface-hover: rgba(34, 42, 58, 0.9);
-  --bg-input: rgba(14, 18, 26, 0.85);
-  
+  /* Surface Tokens (Deep Aubergine & Obsidian Plum) */
+  --bg-primary: #0a0610;
+  --bg-canvas: #0f0817;
+  --bg-surface: rgba(22, 14, 34, 0.78);
+  --bg-surface-elevated: rgba(30, 18, 46, 0.88);
+  --bg-surface-hover: rgba(42, 25, 64, 0.95);
+  --bg-input: rgba(18, 11, 28, 0.88);
+
   /* Border Tokens */
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-medium: rgba(255, 255, 255, 0.14);
-  --border-focus: rgba(99, 102, 241, 0.6);
-  
-  /* Text Tokens */
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-inverse: #0f172a;
+  --border-subtle: rgba(245, 242, 234, 0.08);
+  --border-medium: rgba(245, 242, 234, 0.15);
+  --border-focus: rgba(168, 85, 247, 0.65);
+  --border-vermilion: rgba(255, 77, 54, 0.4);
 
-  /* Brand Emergency Accent Tokens */
-  --accent-primary: #6366f1; /* Indigo Intelligence */
-  --accent-primary-glow: rgba(99, 102, 241, 0.25);
-  
-  --severity-critical: #ef4444; /* Crimson */
-  --severity-critical-bg: rgba(239, 68, 68, 0.15);
-  --severity-critical-border: rgba(239, 68, 68, 0.35);
+  /* Text Tokens (Warm Ivory & Pale Stone) */
+  --text-primary: #fbfaf7;
+  --text-secondary: #d6ccbe;
+  --text-muted: #96869c;
+  --text-inverse: #0a0610;
 
-  --severity-high: #f97316; /* Amber Orange */
-  --severity-high-bg: rgba(249, 115, 22, 0.15);
-  --severity-high-border: rgba(249, 115, 22, 0.35);
+  /* Brand Emergency Accent Tokens (Electric Violet, Orchid & Vermilion) */
+  --accent-primary: #a855f7; /* Electric Violet */
+  --accent-primary-glow: rgba(168, 85, 247, 0.32);
+  --accent-orchid: #c084fc;
+  --accent-plum: #581c87;
 
-  --severity-medium: #eab308; /* Yellow */
-  --severity-medium-bg: rgba(234, 179, 8, 0.15);
-  --severity-medium-border: rgba(234, 179, 8, 0.35);
+  --color-vermilion: #ff4d36; /* Vivid Vermilion Emergency */
+  --color-vermilion-glow: rgba(255, 77, 54, 0.35);
+  --color-coral: #ff7056;
 
-  --severity-low: #38bdf8; /* Sky Blue */
-  --severity-low-bg: rgba(56, 189, 248, 0.15);
-  --severity-low-border: rgba(56, 189, 248, 0.35);
+  --color-acid-lime: #bbf451; /* Acid Lime Live Indicator */
+  --color-acid-lime-glow: rgba(187, 244, 81, 0.35);
 
-  --status-verified: #10b981; /* Emerald */
-  --status-verified-bg: rgba(16, 185, 129, 0.15);
-  --status-verified-border: rgba(16, 185, 129, 0.35);
+  --severity-critical: #ff3b30; /* Vivid Vermilion / Crimson */
+  --severity-critical-bg: rgba(255, 59, 48, 0.16);
+  --severity-critical-border: rgba(255, 59, 48, 0.4);
+
+  --severity-high: #ff7043; /* Vivid Coral / Deep Amber */
+  --severity-high-bg: rgba(255, 112, 67, 0.16);
+  --severity-high-border: rgba(255, 112, 67, 0.4);
+
+  --severity-medium: #fbbf24; /* Warm Gold */
+  --severity-medium-bg: rgba(251, 191, 36, 0.16);
+  --severity-medium-border: rgba(251, 191, 36, 0.4);
+
+  --severity-low: #38bdf8; /* Luminous Sky */
+  --severity-low-bg: rgba(56, 189, 248, 0.16);
+  --severity-low-border: rgba(56, 189, 248, 0.4);
+
+  --status-verified: #a3e635; /* Acid Lime / Emerald Verified */
+  --status-verified-bg: rgba(163, 230, 53, 0.14);
+  --status-verified-border: rgba(163, 230, 53, 0.4);
 
   --status-rejected: #f43f5e; /* Rose */
-  --status-rejected-bg: rgba(244, 63, 94, 0.15);
-  --status-rejected-border: rgba(244, 63, 94, 0.35);
+  --status-rejected-bg: rgba(244, 63, 94, 0.16);
+  --status-rejected-border: rgba(244, 63, 94, 0.4);
 
   /* Typography */
+  --font-display: 'Syne', 'Plus Jakarta Sans', sans-serif;
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
-  --shadow-dock: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 20px rgba(99, 102, 241, 0.15);
+  /* Shadows with violet/aubergine undertones */
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.65);
+  --shadow-glow-violet: 0 0 35px rgba(168, 85, 247, 0.22);
+  --shadow-glow-vermilion: 0 0 35px rgba(255, 77, 54, 0.22);
+  --shadow-dock: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 24px rgba(168, 85, 247, 0.2);
 
   /* Spacing & Radii */
   --radius-sm: 8px;
   --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-lg: 22px;
   --radius-full: 9999px;
 }
 
