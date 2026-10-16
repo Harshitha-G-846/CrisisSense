@@ -6,8 +6,10 @@ and role-based authorization for ResQ-Sense.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -17,7 +19,7 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from member3.database import get_db
-from member3.models import User
+from member3.models import AccountVerification, User
 
 # Configuration loaded from environment variables
 JWT_SECRET = os.environ.get(
@@ -54,6 +56,24 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         )
     except Exception:
         return False
+
+
+def generate_verification_code() -> str:
+    """Generate a cryptographically secure 6-digit verification code."""
+    return "".join(secrets.choice("0123456789") for _ in range(6))
+
+
+def hash_verification_code(code: str) -> str:
+    """Hash the verification code with SHA-256 for secure database storage."""
+    return hashlib.sha256(code.strip().encode("utf-8")).hexdigest()
+
+
+def verify_code_hash(code: str, stored_hash: str) -> bool:
+    """Constant-time comparison of a verification code against stored SHA-256 hash."""
+    if not code or not stored_hash:
+        return False
+    candidate_hash = hashlib.sha256(code.strip().encode("utf-8")).hexdigest()
+    return secrets.compare_digest(candidate_hash, stored_hash)
 
 
 def validate_email_address(email: str) -> str:
@@ -231,3 +251,4 @@ def get_current_citizen_user(
             detail="Access denied: Citizen dashboard is only accessible to citizen accounts.",
         )
     return user
+

@@ -397,3 +397,4 @@ def test_crisissense_db_strictly_untouched():
         assert final_counts == _INITIAL_COUNTS, (
             f"crisissense.db was modified during test run! Initial: {_INITIAL_COUNTS}, Final: {final_counts}"
         )
+

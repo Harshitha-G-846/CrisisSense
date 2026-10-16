@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import (
-    JSON, Column, DateTime, Float, ForeignKey, String, Text
+    Boolean, Column, DateTime, Float, ForeignKey, Integer, JSON, String, Text
 )
 from sqlalchemy.orm import relationship
 
@@ -23,6 +23,27 @@ def new_report_id():
 
 def new_user_id():
     return f"USER-{uuid4().hex}"
+
+
+def new_verification_id():
+    return f"VERIF-{uuid4().hex}"
+
+
+class AccountVerification(Base):
+    __tablename__ = "account_verifications"
+
+    id = Column(String, primary_key=True, default=new_verification_id)
+    email = Column(String, unique=True, index=True, nullable=False)
+    code_hash = Column(String, nullable=False)
+    is_verified = Column(Boolean, default=False, nullable=False)
+    attempts_count = Column(Integer, default=0, nullable=False)
+    resend_count = Column(Integer, default=0, nullable=False)
+    last_sent_at = Column(DateTime, default=utc_now, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(
+        DateTime, default=utc_now, onupdate=utc_now, nullable=False
+    )
 
 
 class User(Base):
@@ -80,6 +101,8 @@ class Incident(Base):
         nullable=True,
         index=True,
     )
+    # Admin / commander feedback or notes (e.g. for NEEDS_MORE_INFO, APPROVE, REJECT)
+    admin_feedback = Column(Text, nullable=True)
 
     citizen = relationship("User", back_populates="incidents")
     reports = relationship(

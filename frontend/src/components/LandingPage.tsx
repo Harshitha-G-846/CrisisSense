@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
+  Activity,
+  AlertCircle,
   ArrowRight,
   ArrowUpRight,
   CheckCircle2,
@@ -16,6 +18,7 @@ import {
   Video,
   Volume2,
 } from 'lucide-react'
+import { ThemeSelector } from './ThemeSelector'
 
 interface LandingPageProps {
   onSelectRole: (role: 'citizen' | 'authority') => void
@@ -892,9 +895,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <a href="#storytelling" className="quick-nav-link">
             Signal Lifecycle
           </a>
+          <a href="#accuracy" className="quick-nav-link">
+            Model Metrics
+          </a>
           <a href="#oversight" className="quick-nav-link">
             Human Charter
           </a>
+          <ThemeSelector />
         </div>
       </nav>
 
@@ -1375,6 +1382,176 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* MULTIMODAL MODEL EVALUATION & ACCURACY SECTION */}
+      <section
+        className="multimodal-accuracy-section"
+        id="accuracy"
+        aria-labelledby="accuracy-section-title"
+      >
+        <div className="story-section-header">
+          <div className="story-tag-pill">
+            <Activity size={14} />
+            <span>Empirical AI Benchmarks &amp; Limitations</span>
+          </div>
+          <h2 id="accuracy-section-title" className="story-main-heading">
+            Multimodal Model Accuracy &amp; Evaluation
+          </h2>
+          <p className="story-sub-heading">
+            Transparent reporting of verified test-set performance, validation contexts, and operational limitations across our crisis perception pipelines.
+          </p>
+        </div>
+
+        {/* Operational Ground Truth Disclaimer */}
+        <div className="accuracy-disclaimer-card" role="note">
+          <AlertCircle size={20} className="disclaimer-icon" />
+          <div className="disclaimer-text">
+            <strong>Critical Distinction: Benchmark Accuracy vs. Prediction Confidence</strong>
+            <p>
+              Confidence scores or softmax probabilities output during live inference represent model certainty under specific inputs—they are <em>never</em> represented as model accuracy. True accuracy is strictly evaluated against standardized, held-out ground truth crisis datasets. Where rigorous benchmark data is unavailable in this environment, metrics are explicitly labeled <strong>Evaluation pending</strong>.
+            </p>
+          </div>
+        </div>
+
+        {/* 4 Modalities Cards Grid */}
+        <div className="accuracy-cards-grid">
+          {/* Card 1: Text Crisis Detection */}
+          <div className="accuracy-card verified-metric">
+            <div className="accuracy-card-header">
+              <div className="modality-badge text">
+                <FileText size={16} />
+                <span>Text Modality</span>
+              </div>
+              <span className="eval-status-pill verified">Validated Benchmark</span>
+            </div>
+
+            <h3 className="model-name">Emergency Binary Classifier</h3>
+            <p className="model-arch">TF-IDF Vectorizer + Regularized Logistic Regression (10,000 features, n-grams 1–2)</p>
+
+            <div className="metric-highlight-box">
+              <span className="metric-val">92.76%</span>
+              <span className="metric-lbl">Holdout Test Set Accuracy</span>
+            </div>
+
+            <div className="metric-details-list">
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Dataset</span>
+                <span className="detail-val">CrisisLex &amp; CrisisNLP Disaster Corpora</span>
+              </div>
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Evaluation Context</span>
+                <span className="detail-val">Stratified 5-fold cross-validation on labeled eyewitness emergency dispatches</span>
+              </div>
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Limitations</span>
+                <span className="detail-val">English vocabulary baseline; shortened SMS shorthand and regional dialect transliterations (e.g. Hinglish) may exhibit reduced sensitivity.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Humanitarian Info Type Categorization */}
+          <div className="accuracy-card verified-metric">
+            <div className="accuracy-card-header">
+              <div className="modality-badge text">
+                <Layers size={16} />
+                <span>Text Categorization</span>
+              </div>
+              <span className="eval-status-pill verified">Validated Benchmark</span>
+            </div>
+
+            <h3 className="model-name">Humanitarian Information Classifier</h3>
+            <p className="model-arch">TF-IDF Multi-Class Classifier (7 Humanitarian Action Categories)</p>
+
+            <div className="metric-highlight-box">
+              <span className="metric-val">71.42%</span>
+              <span className="metric-lbl">Multi-Class Categorization Accuracy</span>
+            </div>
+
+            <div className="metric-details-list">
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Dataset</span>
+                <span className="detail-val">CrisisNLP Humanitarian Response Test Collection</span>
+              </div>
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Evaluation Context</span>
+                <span className="detail-val">Multi-class classification evaluating urgent categories: Injured/Dead, Infrastructure Damage, Caution/Advice, Donations</span>
+              </div>
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Limitations</span>
+                <span className="detail-val">Skewed sample distribution in disaster logs; composite messages expressing multiple concurrent needs can favor the primary syntactic clause.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Visual Hazard Analysis (Image & Drone Video) */}
+          <div className="accuracy-card pending-metric">
+            <div className="accuracy-card-header">
+              <div className="modality-badge visual">
+                <Video size={16} />
+                <span>Vision &amp; Video Modality</span>
+              </div>
+              <span className="eval-status-pill pending">Evaluation pending</span>
+            </div>
+
+            <h3 className="model-name">Visual Hazard &amp; Aerial Classifier</h3>
+            <p className="model-arch">OpenAI CLIP ViT-B/32 Zero-Shot Cosine Embeddings &amp; Temporal Frame Sampling</p>
+
+            <div className="metric-highlight-box pending">
+              <span className="metric-val pending">Evaluation pending</span>
+              <span className="metric-lbl">Formal Precision / Recall Benchmark</span>
+            </div>
+
+            <div className="metric-details-list">
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Required Evaluation</span>
+                <span className="detail-val">End-to-end mAP &amp; Top-1 Accuracy benchmarking on standardized disaster image/video datasets (e.g. CrisisMMD, UCF-Crime aerial subsets).</span>
+              </div>
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Live Indicator</span>
+                <span className="detail-val">Zero-shot prompt cosine similarities (e.g. 0.88–0.94) are advisory heuristics indicating semantic proximity, not verified dataset accuracy.</span>
+              </div>
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Limitations</span>
+                <span className="detail-val">Susceptible to occlusion, nighttime imagery, smoke density, and atypical aerial camera angles without domain-specific fine-tuning.</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Audio Speech Recognition & Acoustics */}
+          <div className="accuracy-card pending-metric">
+            <div className="accuracy-card-header">
+              <div className="modality-badge audio">
+                <Volume2 size={16} />
+                <span>Audio Modality</span>
+              </div>
+              <span className="eval-status-pill pending">Evaluation pending</span>
+            </div>
+
+            <h3 className="model-name">Emergency Speech &amp; Voice Ingestion</h3>
+            <p className="model-arch">Whisper CTC / Autoregressive ASR + Keyword Emergency Heuristics</p>
+
+            <div className="metric-highlight-box pending">
+              <span className="metric-val pending">Evaluation pending</span>
+              <span className="metric-lbl">Acoustic Word Error Rate (WER)</span>
+            </div>
+
+            <div className="metric-details-list">
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Required Evaluation</span>
+                <span className="detail-val">Standardized WER and Keyword Spotting (KWS) benchmark under adverse signal-to-noise ratios (SNR &lt; 5 dB, rain, siren, distress noise).</span>
+              </div>
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Live Indicator</span>
+                <span className="detail-val">Whisper produces rich phonetic transcripts; however, field accuracy under high-noise Indian disaster environments remains in offline testing.</span>
+              </div>
+              <div className="metric-detail-row">
+                <span className="detail-lbl">Limitations</span>
+                <span className="detail-val">Wind noise, heavy rain on microphone, screaming, and mixed regional code-switching can degrade raw transcription fidelity.</span>
               </div>
             </div>
           </div>

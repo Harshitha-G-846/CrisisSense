@@ -1,3 +1,4 @@
+import re
 import joblib
 from scipy.sparse import hstack
 from pathlib import Path
@@ -72,13 +73,23 @@ incident_vectorizer = joblib.load(
     MODEL_DIR / "incident_type_vectorizer.pkl"
 )
 
+# Ensure scikit-learn version interoperability (e.g. multi_class attribute)
+for _loaded_m in (crisis_model, info_model, incident_model):
+    if hasattr(_loaded_m, "predict_proba") and not hasattr(_loaded_m, "multi_class"):
+        _loaded_m.multi_class = "auto"
+
 
 # ==================================================
-# 4. Text Cleaning
+# 4. Text Cleaning & Domain Preprocessing
 # ==================================================
 
 def clean_text(text):
-    return str(text).lower()
+    text = str(text).lower()
+    # Normalize common South Asian disaster terms (e.g. waterlogging, water-logging, inundation)
+    # into the flood domain so crisis detection and incident classification recognize flood emergencies accurately.
+    text = re.sub(r"\bwater[\s\-_]?logg?(?:ed|ing)?\b", "waterlogging flood", text)
+    text = re.sub(r"\binundat(?:ed|ion)\b", "inundation flood", text)
+    return text
 
 
 # ==================================================

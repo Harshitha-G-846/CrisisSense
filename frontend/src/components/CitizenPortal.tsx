@@ -9,7 +9,6 @@ import {
   Info,
   MapPin,
   Mic,
-  Navigation,
   PhoneCall,
   Radio,
   Send,
@@ -32,8 +31,11 @@ import {
   type CitizenUser,
   type Incident,
   type IncidentDetail,
+  type LocationInfo,
 } from '../services/api'
 import { AuthModal } from './AuthModal'
+import { AudioRecorder } from './AudioRecorder'
+import { LocationSearchPicker } from './LocationSearchPicker'
 
 interface SavedReport {
   incident_id: string
@@ -74,11 +76,12 @@ export const CitizenPortal: React.FC<{
     lat: number
     lon: number
   } | null>(null)
-  const [locationLoading, setLocationLoading] = useState(false)
+  const [selectedLocation, setSelectedLocation] = useState<LocationInfo | null>(null)
   const [mediaFile, setMediaFile] = useState<File | null>(null)
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | null>(
     null,
   )
+  const [mediaMode, setMediaMode] = useState<'upload' | 'record'>('upload')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submissionResult, setSubmissionResult] =
@@ -180,32 +183,6 @@ export const CitizenPortal: React.FC<{
     }
   }
 
-  // Geolocation Handler
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser. Please enter your location manually.')
-      return
-    }
-
-    setLocationLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude
-        const lon = pos.coords.longitude
-        setDeviceCoords({ lat, lon })
-        if (!locationName.trim()) {
-          setLocationName(`GPS: ${lat.toFixed(4)}, ${lon.toFixed(4)}`)
-        }
-        setLocationLoading(false)
-      },
-      (err) => {
-        setLocationLoading(false)
-        console.warn('Geolocation failed:', err.message)
-        alert('Could not retrieve device location. Please type your location manually.')
-      },
-      { timeout: 10000, enableHighAccuracy: true },
-    )
-  }
 
   // Media Handler
   const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,13 +240,25 @@ export const CitizenPortal: React.FC<{
         if (combinedText) {
           formData.append('text', combinedText)
         }
+        if (locationName.trim()) {
+          formData.append('location_name', locationName.trim())
+        }
+        if (deviceCoords) {
+          formData.append('latitude', String(deviceCoords.lat))
+          formData.append('longitude', String(deviceCoords.lon))
+        }
         if (mediaType === 'image') formData.append('image', mediaFile)
         else if (mediaType === 'video') formData.append('video', mediaFile)
         else if (mediaType === 'audio') formData.append('audio', mediaFile)
 
         result = await api.analyzeEvidence(formData)
       } else {
-        result = await api.analyzeText(combinedText)
+        result = await api.analyzeText(
+          combinedText,
+          locationName.trim() || undefined,
+          deviceCoords?.lat,
+          deviceCoords?.lon,
+        )
       }
 
       setSubmissionResult(result)
@@ -569,11 +558,15 @@ export const CitizenPortal: React.FC<{
                         title="Click to track live dispatch status"
                       >
                         <div className="citizen-incident-card-top">
-                          <span className="citizen-incident-id">{incId}</span>
+                          <span className="citizen-incident-id" title={incId}>
+                            {incId}
+                          </span>
                           <span
                             className={`citizen-status-badge ${(
                               inc.verification_status || 'pending'
-                            ).toLowerCase()}`}
+                            )
+                              .toLowerCase()
+                              .replace(/\s+/g, '_')}`}
                           >
                             {inc.verification_status || 'PENDING'}
                           </span>
@@ -592,6 +585,12 @@ export const CitizenPortal: React.FC<{
                               : 'Recently'}
                           </span>
                         </div>
+                        {inc.verification_status === 'NEEDS_MORE_INFO' && inc.admin_feedback && (
+                          <div className="citizen-card-feedback-hint">
+                            <AlertCircle size={12} />
+                            <span>Requested Info: {inc.admin_feedback}</span>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -778,7 +777,7 @@ export const CitizenPortal: React.FC<{
                   <div className="citizen-conflict-top">
                     <AlertTriangle size={22} style={{ color: '#eab308' }} />
                     <div>
-                      <h3 className="conflict-title" style={{ color: '#fef08a' }}>
+                      <h3 className="conflict-title" style={{ color: 'var(--severity-medium-color)' }}>
                         TEMPORAL UNCERTAINTY — HUMAN VERIFICATION REQUIRED
                       </h3>
                       <p className="conflict-subtitle">
@@ -847,31 +846,42 @@ export const CitizenPortal: React.FC<{
                 <div className="ai-stat-item">
                   <span className="stat-label">Detected Category</span>
                   <strong>
-                    {submissionResult.crisis_analysis?.incident_type ||
-                      'Crisis Report'}
+                    {submissionResult.crisis_analysis?.incident_type
+                      ? submissionResult.crisis_analysis.incident_type
+                      : submissionResult.crisis_analysis?.is_crisis === false
+                      ? 'Analysis unavailable (Non-crisis text)'
+                      : 'Analysis unavailable'}
                   </strong>
                 </div>
 
                 <div className="ai-stat-item">
                   <span className="stat-label">Assessed Severity</span>
-                  <span
-                    className={`badge badge-${(
-                      submissionResult.crisis_analysis?.severity || 'LOW'
-                    ).toLowerCase()}`}
-                  >
-                    {submissionResult.crisis_analysis?.severity || 'UNKNOWN'}
-                  </span>
+                  {submissionResult.crisis_analysis?.severity ? (
+                    <span
+                      className={`badge badge-${submissionResult.crisis_analysis.severity.toLowerCase()}`}
+                    >
+                      {submissionResult.crisis_analysis.severity}
+                    </span>
+                  ) : (
+                    <span className="badge badge-pending">
+                      Analysis unavailable
+                    </span>
+                  )}
                 </div>
 
                 <div className="ai-stat-item">
                   <span className="stat-label">Currentness Verification</span>
-                  <span
-                    className={`badge badge-${(
-                      submissionResult.currentness?.currentness || 'CURRENT'
-                    ).toLowerCase()}`}
-                  >
-                    {submissionResult.currentness?.currentness || 'CURRENT'}
-                  </span>
+                  {submissionResult.currentness?.currentness ? (
+                    <span
+                      className={`badge badge-${submissionResult.currentness.currentness.toLowerCase()}`}
+                    >
+                      {submissionResult.currentness.currentness}
+                    </span>
+                  ) : (
+                    <span className="badge badge-pending">
+                      Pending review
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -972,67 +982,99 @@ export const CitizenPortal: React.FC<{
                 </select>
               </div>
 
-              {/* Location Input */}
+              {/* Location Input with Search, Indian Cities support & Device GPS */}
               <div className="form-group">
-                <div className="label-with-action">
-                  <label htmlFor="incident-loc">Incident Location</label>
-                  <button
-                    type="button"
-                    className="location-fetch-btn"
-                    onClick={handleGetLocation}
-                    disabled={locationLoading}
-                  >
-                    <Navigation size={14} />
-                    <span>
-                      {locationLoading ? 'Locating…' : 'Use Current Device Location'}
-                    </span>
-                  </button>
-                </div>
-
-                <div className="input-with-icon">
-                  <MapPin size={18} className="field-icon" />
-                  <input
-                    id="incident-loc"
-                    type="text"
-                    className="form-input has-icon"
-                    placeholder="e.g. Guwahati, Assam or Whitefield, Bangalore (or leave for AI extraction)"
-                    value={locationName}
-                    onChange={(e) => setLocationName(e.target.value)}
-                  />
-                </div>
-                {deviceCoords && (
-                  <span className="location-coords-badge">
-                    GPS Coordinates Captured: {deviceCoords.lat.toFixed(4)},{' '}
-                    {deviceCoords.lon.toFixed(4)}
-                  </span>
-                )}
+                <LocationSearchPicker
+                  selectedLocation={selectedLocation}
+                  onLocationSelect={(loc: LocationInfo | null) => {
+                    setSelectedLocation(loc)
+                    if (loc) {
+                      setLocationName(loc.text || '')
+                      if (loc.latitude != null && loc.longitude != null) {
+                        setDeviceCoords({ lat: loc.latitude, lon: loc.longitude })
+                      }
+                    } else {
+                      setLocationName('')
+                      setDeviceCoords(null)
+                    }
+                  }}
+                />
               </div>
 
-              {/* Multimodal Upload Dropzone */}
+              {/* Multimodal Upload & Audio Recording */}
               <div className="form-group">
-                <label>Media Evidence (Photo, Video, or Voice Audio)</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ margin: 0 }}>Media Evidence (Photo, Video, or Voice Audio)</label>
+                  {!mediaFile && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className={`btn-mode-toggle ${mediaMode === 'upload' ? 'active' : ''}`}
+                        onClick={() => setMediaMode('upload')}
+                        style={{
+                          background: mediaMode === 'upload' ? 'var(--palette-camel)' : 'rgba(191, 141, 98, 0.15)',
+                          color: mediaMode === 'upload' ? '#ffffff' : 'var(--palette-sandy-clay)',
+                          border: '1px solid var(--border-medium)',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Upload File
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn-mode-toggle ${mediaMode === 'record' ? 'active' : ''}`}
+                        onClick={() => setMediaMode('record')}
+                        style={{
+                          background: mediaMode === 'record' ? 'var(--palette-camel)' : 'rgba(191, 141, 98, 0.15)',
+                          color: mediaMode === 'record' ? '#ffffff' : 'var(--palette-sandy-clay)',
+                          border: '1px solid var(--border-medium)',
+                          borderRadius: '6px',
+                          padding: '4px 10px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Record Voice Live
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 {!mediaFile ? (
-                  <div className="media-dropzone">
-                    <input
-                      type="file"
-                      id="media-file-input"
-                      className="hidden-file-input"
-                      accept="image/*,video/*,audio/*"
-                      onChange={handleMediaUpload}
+                  mediaMode === 'record' ? (
+                    <AudioRecorder
+                      onAudioReady={(file: File | null) => {
+                        setMediaFile(file)
+                        setMediaType(file ? 'audio' : null)
+                      }}
                     />
-                    <label htmlFor="media-file-input" className="dropzone-label">
-                      <div className="dropzone-icons">
-                        <ImageIcon size={22} />
-                        <Video size={22} />
-                        <Mic size={22} />
-                      </div>
-                      <strong>Upload Media Evidence</strong>
-                      <span>
-                        Supports Images (OCR scan), Videos (Frame analysis), or Voice notes (Whisper transcription)
-                      </span>
-                    </label>
-                  </div>
+                  ) : (
+                    <div className="media-dropzone">
+                      <input
+                        type="file"
+                        id="media-file-input"
+                        className="hidden-file-input"
+                        accept="image/*,video/*,audio/*"
+                        onChange={handleMediaUpload}
+                      />
+                      <label htmlFor="media-file-input" className="dropzone-label">
+                        <div className="dropzone-icons">
+                          <ImageIcon size={22} />
+                          <Video size={22} />
+                          <Mic size={22} />
+                        </div>
+                        <strong>Upload Media Evidence</strong>
+                        <span>
+                          Supports Images (OCR scan), Videos (Frame analysis), or Voice notes (Whisper transcription)
+                        </span>
+                      </label>
+                    </div>
+                  )
                 ) : (
                   <div className="media-attached-card">
                     <div className="media-file-meta">
@@ -1176,7 +1218,7 @@ export const CitizenPortal: React.FC<{
               <p style={{ margin: '4px 0 0 0' }}>{trackingError}</p>
               {!currentUser && (
                 <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', width: '100%' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#cbd5e1' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
                     Submitted this incident? Citizen incident records are private. Sign in with your registered account to view your submission details.
                   </p>
                   <button
@@ -1278,9 +1320,18 @@ export const CitizenPortal: React.FC<{
                 {trackedIncident.verification_status === 'NEEDS_MORE_INFO' && (
                   <div className="status-banner-content warning">
                     <AlertCircle size={18} />
-                    <span>
-                      Authorities requested additional details. Please provide an update below.
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <span style={{ fontWeight: 600 }}>
+                        Authorities requested additional information:
+                      </span>
+                      {trackedIncident.admin_feedback ? (
+                        <p style={{ margin: 0, fontStyle: 'italic', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                          "{trackedIncident.admin_feedback}"
+                        </p>
+                      ) : (
+                        <span>Please provide an update or additional details below.</span>
+                      )}
+                    </div>
                   </div>
                 )}
                 {trackedIncident.verification_status === 'REJECTED' && (

@@ -5,6 +5,7 @@ import {
   Maximize2,
   AlertTriangle,
   Layers,
+  X,
 } from 'lucide-react'
 import type { Incident } from '../services/api'
 
@@ -317,8 +318,9 @@ export const InteractiveMap: React.FC<MapProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowUnmappedList(false)}
+                    aria-label="Close unmapped list"
                   >
-                    &times;
+                    <X size={14} />
                   </button>
                 </div>
                 <p className="unmapped-desc">

@@ -56,6 +56,35 @@ _DEFAULT_MODEL_SIZE = os.environ.get("WHISPER_MODEL_SIZE", "base")
 # uncertainty of a spoken claim vs. a documented timestamp.
 _AUDIO_WEIGHT_DISCOUNT = 0.10
 
+# Maximum audio upload size (50MB)
+MAX_AUDIO_SIZE_BYTES = 50 * 1024 * 1024
+
+
+def _patch_av_metadata_errors_compat() -> None:
+    """Ensure PyAV open() compatibility with faster-whisper.
+
+    PyAV >= 14/15/19 removed the deprecated 'metadata_errors' parameter, which causes
+    faster_whisper's decode_audio to throw TypeError: open() got an unexpected keyword
+    argument 'metadata_errors'. This shim strips that parameter if passed.
+    """
+    try:
+        import av
+        if not getattr(av, "_crisissense_metadata_errors_patched", False):
+            orig_open = av.open
+
+            def compat_av_open(*args, **kwargs):
+                kwargs.pop("metadata_errors", None)
+                return orig_open(*args, **kwargs)
+
+            av.open = compat_av_open
+            av._crisissense_metadata_errors_patched = True
+    except Exception:
+        pass
+
+
+# Apply compatibility patch eagerly upon module import
+_patch_av_metadata_errors_compat()
+
 
 # ---------------------------------------------------------------------------
 # Validation
@@ -80,8 +109,15 @@ def validate_audio_file(path: Union[str, os.PathLike]) -> Tuple[bool, str]:
     if not os.path.isfile(path):
         return False, f"Path is not a file: {path}"
 
-    if os.path.getsize(path) == 0:
+    file_size = os.path.getsize(path)
+    if file_size == 0:
         return False, f"File is empty (0 bytes): {path}"
+
+    if file_size > MAX_AUDIO_SIZE_BYTES:
+        return False, (
+            f"Audio file size ({file_size} bytes) exceeds maximum allowable limit of "
+            f"{MAX_AUDIO_SIZE_BYTES // (1024 * 1024)}MB."
+        )
 
     ext = os.path.splitext(path)[-1].lower()
     if ext not in SUPPORTED_EXTENSIONS:

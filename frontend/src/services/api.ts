@@ -84,6 +84,7 @@ export interface Incident {
   status?: IncidentStatus | string
   verification_status?: VerificationStatus | string
   response_status?: ResponseStatus | string
+  admin_feedback?: string | null
   report_count?: number
   has_conflict?: boolean
   conflicts_detected?: string[]
@@ -112,6 +113,7 @@ export interface CitizenUser {
   full_name: string
   email: string
   role: 'citizen' | 'authority' | string
+  is_verified?: boolean
   created_at?: string
 }
 
@@ -119,6 +121,64 @@ export interface AuthResponse {
   access_token: string
   token_type: string
   user: CitizenUser
+  verification?: {
+    status: string
+    message: string
+    expires_in_minutes?: number
+  }
+}
+
+export interface LocationSearchResult {
+  display_name: string
+  city: string
+  state: string
+  country: string
+  latitude: number
+  longitude: number
+  source: string
+}
+
+export interface AnalyticsMetrics {
+  total_incidents: number
+  total_reports: number
+  severity_distribution: Record<string, number>
+  status_distribution: Record<string, number>
+  verification_distribution: Record<string, number>
+  incident_types: Record<string, number>
+  timeline: Array<{ date: string; count: number }>
+}
+
+export interface VerifyCodeResponse {
+  status: string
+  message: string
+  access_token: string
+  token_type: string
+  user: CitizenUser
+}
+
+export interface ResendCodeResponse {
+  status: string
+  message: string
+  resend_count: number
+  max_resends: number
+  expires_in_minutes: number
+}
+
+export interface AdminInfoRequestResponse {
+  status: string
+  message: string
+  incident_id: string
+  recipient_name: string
+  recipient_email_masked: string
+  dispatched_at: string
+}
+
+export interface AudioTranscriptionResult {
+  text: string
+  succeeded: boolean
+  language?: string | null
+  duration?: number | null
+  error?: string | null
 }
 
 export interface EmailNotificationStatus {
@@ -136,6 +196,7 @@ export interface AnalyzeResult {
   storage_status?: string
   crisis_analysis: CrisisAnalysis
   currentness: CurrentnessData
+  audio_transcription?: AudioTranscriptionResult | null
   has_conflict?: boolean
   conflicts_detected?: string[]
   email_notification?: EmailNotificationStatus
@@ -146,7 +207,12 @@ export interface VerificationResponse {
   decision: VerificationDecision
   verification_status: string
   reason?: string | null
+  admin_feedback?: string | null
   message: string
+  email_sent?: boolean | null
+  email_status?: string | null
+  email_error?: string | null
+  recipient_email_masked?: string | null
 }
 
 export interface FeedbackResponse {
@@ -374,10 +440,20 @@ export const api = {
     )
   },
 
-  analyzeText: (text: string) =>
+  analyzeText: (
+    text: string,
+    location_name?: string,
+    latitude?: number,
+    longitude?: number,
+  ) =>
     request<AnalyzeResult>('/analyze-text', {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({
+        text,
+        location_name: location_name || null,
+        latitude: latitude != null ? latitude : null,
+        longitude: longitude != null ? longitude : null,
+      }),
     }),
 
   analyzeEvidence: (formData: FormData) =>
@@ -497,4 +573,48 @@ export const api = {
       monitored_incidents: number
       grid_status: string
     }>('/public/stats'),
+
+  // --- Location Search (Feature B) ---
+  searchLocations: (query: string) => {
+    const q = encodeURIComponent(query.trim())
+    return request<{ query: string; count: number; results: LocationSearchResult[] }>(
+      `/locations/search?q=${q}`,
+    )
+  },
+
+  // --- Account Verification (Feature D) ---
+  verifyEmailCode: async (email: string, code: string) => {
+    const res = await request<VerifyCodeResponse>('/auth/verify-code', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim(), code: code.trim() }),
+    })
+    if (res.access_token) {
+      authStorage.setToken(res.access_token)
+      authStorage.setUser(res.user)
+    }
+    return res
+  },
+
+  resendVerificationCode: (email: string) =>
+    request<ResendCodeResponse>('/auth/resend-code', {
+      method: 'POST',
+      body: JSON.stringify({ email: email.trim() }),
+    }),
+
+  getAuthStatus: () =>
+    request<CitizenUser & { is_verified: boolean }>('/auth/status'),
+
+  // --- Admin Information Request (Feature E) ---
+  requestIncidentInfo: (incidentId: string, message: string) =>
+    request<AdminInfoRequestResponse>(
+      `/incidents/${encodeURIComponent(incidentId)}/request-info`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      },
+    ),
+
+  // --- Analytics & Visualizations (Feature F) ---
+  getAnalyticsMetrics: () =>
+    request<AnalyticsMetrics>('/analytics/metrics'),
 }

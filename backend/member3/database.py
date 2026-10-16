@@ -50,6 +50,8 @@ def ensure_schema_compatibility(target_engine=None):
         inc_cols = {row[1] for row in cursor.fetchall()}
         if inc_cols and "citizen_id" not in inc_cols:
             cursor.execute("ALTER TABLE incidents ADD COLUMN citizen_id TEXT REFERENCES users(id)")
+        if inc_cols and "admin_feedback" not in inc_cols:
+            cursor.execute("ALTER TABLE incidents ADD COLUMN admin_feedback TEXT")
 
         cursor.execute("PRAGMA table_info(reports)")
         rep_cols = {row[1] for row in cursor.fetchall()}

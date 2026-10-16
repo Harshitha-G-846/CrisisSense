@@ -9,6 +9,7 @@ import {
   XCircle,
   ArrowLeftRight,
   Layers,
+  BarChart3,
 } from 'lucide-react'
 
 export type AppView =
@@ -22,6 +23,7 @@ export type AppView =
   | 'authority-verified'
   | 'authority-rejected'
   | 'authority-map'
+  | 'authority-analytics'
   | 'authority-resources'
 
 interface DockProps {
@@ -104,6 +106,11 @@ export const Dock: React.FC<DockProps> = ({
       id: 'authority-map',
       label: 'Tactical Map',
       icon: <MapIcon size={20} />,
+    },
+    {
+      id: 'authority-analytics',
+      label: 'Analytics',
+      icon: <BarChart3 size={20} />,
     },
     {
       id: 'switch-role',

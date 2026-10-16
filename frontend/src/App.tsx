@@ -22,6 +22,7 @@ import { LandingPage } from './components/LandingPage'
 import { CitizenPortal } from './components/CitizenPortal'
 import { AuthorityWorkspace } from './components/AuthorityWorkspace'
 import { InteractiveMap } from './components/Map'
+import { ThemeSelector } from './components/ThemeSelector'
 import './index.css'
 import './App.css'
 
@@ -258,6 +259,8 @@ export function App() {
           </div>
 
           <div className="header-right">
+            <ThemeSelector />
+
             <div
               className={`backend-status-pill ${
                 backendOnline === true
@@ -297,9 +300,9 @@ export function App() {
                 type="button"
                 className="role-switcher-btn"
                 style={{
-                  borderColor: 'rgba(239, 68, 68, 0.4)',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  color: '#fca5a5',
+                  borderColor: 'var(--severity-critical-border)',
+                  background: 'var(--severity-critical-bg)',
+                  color: 'var(--severity-critical-color)',
                 }}
                 onClick={() => void handleCitizenLogout()}
                 title="Sign out of Citizen Portal"
@@ -315,9 +318,9 @@ export function App() {
                 type="button"
                 className="role-switcher-btn"
                 style={{
-                  borderColor: 'rgba(239, 68, 68, 0.4)',
-                  background: 'rgba(239, 68, 68, 0.12)',
-                  color: '#fca5a5',
+                  borderColor: 'var(--severity-critical-border)',
+                  background: 'var(--severity-critical-bg)',
+                  color: 'var(--severity-critical-color)',
                 }}
                 onClick={() => {
                   api.logoutAdmin()
@@ -426,9 +429,9 @@ export function App() {
             <AuthorityWorkspace initialTab="all" />
           ) : (
             <div className="authority-forbidden-card" style={{ padding: '80px 20px', textAlign: 'center' }}>
-              <ShieldCheck size={48} style={{ color: '#ef4444', marginBottom: '16px' }} />
-              <h2 style={{ color: '#f8fafc', marginBottom: '8px' }}>Administrator Authentication Required</h2>
-              <p style={{ color: '#94a3b8', maxWidth: '480px', margin: '0 auto 24px auto' }}>
+              <ShieldCheck size={48} style={{ color: 'var(--severity-critical)', marginBottom: '16px' }} />
+              <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>Administrator Authentication Required</h2>
+              <p style={{ color: 'var(--text-secondary)', maxWidth: '480px', margin: '0 auto 24px auto' }}>
                 Access to the Authority Command Hub is restricted to verified emergency response administrators.
               </p>
               <button
@@ -484,6 +487,19 @@ export function App() {
         {currentView === 'authority-map' && (
           authStorage.isAuthority() ? (
             <AuthorityWorkspace initialTab="map" />
+          ) : (
+            <div className="authority-forbidden-card" style={{ padding: '80px 20px', textAlign: 'center' }}>
+              <h2>Administrator Authentication Required</h2>
+              <button type="button" className="btn-primary-glow" onClick={() => setShowAdminAuthModal(true)}>
+                Sign In as Administrator
+              </button>
+            </div>
+          )
+        )}
+
+        {currentView === 'authority-analytics' && (
+          authStorage.isAuthority() ? (
+            <AuthorityWorkspace initialTab="analytics" />
           ) : (
             <div className="authority-forbidden-card" style={{ padding: '80px 20px', textAlign: 'center' }}>
               <h2>Administrator Authentication Required</h2>

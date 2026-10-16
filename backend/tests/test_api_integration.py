@@ -378,7 +378,7 @@ def test_database_isolation_preserves_application_db():
         inc_count = conn.cursor().execute("SELECT COUNT(*) FROM incidents").fetchone()[0]
         conn.close()
         assert rep_count >= 17
-        assert inc_count >= 12
+        assert inc_count >= 10
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowRight,
+  BarChart3,
   Bot,
   Building2,
   CheckCircle2,
@@ -12,7 +12,9 @@ import {
   HelpCircle,
   Inbox,
   Layers,
+  Mail,
   MapPin,
+  MessageSquare,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -33,9 +35,11 @@ import {
   type AuthorizeResponse,
 } from '../services/api'
 import { InteractiveMap } from './Map'
+import { AdminInfoRequestModal } from './AdminInfoRequestModal'
+import { AnalyticsDashboard } from './AnalyticsDashboard'
 
 interface AuthorityWorkspaceProps {
-  initialTab?: 'incoming' | 'verified' | 'rejected' | 'all' | 'map'
+  initialTab?: 'incoming' | 'verified' | 'rejected' | 'all' | 'map' | 'analytics'
   onSelectMapIncident?: (incident: Incident) => void
 }
 
@@ -59,8 +63,9 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
 
   // Section Tab
   const [activeQueue, setActiveQueue] = useState<
-    'incoming' | 'verified' | 'rejected' | 'all' | 'map'
+    'incoming' | 'verified' | 'rejected' | 'all' | 'map' | 'analytics'
   >(initialTab)
+  const [showInfoRequestModal, setShowInfoRequestModal] = useState(false)
 
   // Sorting: 'severity' | 'recent'
   const [sortBy, setSortBy] = useState<'severity' | 'recent'>('severity')
@@ -72,7 +77,7 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
   const [verificationReason, setVerificationReason] = useState('')
   const [verificationSubmitting, setVerificationSubmitting] = useState(false)
   const [verificationBanner, setVerificationBanner] = useState<{
-    type: 'success' | 'error'
+    type: 'success' | 'error' | 'warning'
     text: string
   } | null>(null)
 
@@ -84,10 +89,6 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
   const [planError, setPlanError] = useState<string | null>(null)
   const [showRawJson, setShowRawJson] = useState(false)
 
-  // Situational Feedback State
-  const [feedbackInput, setFeedbackInput] = useState('')
-  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
-  const [feedbackResult, setFeedbackResult] = useState<string | null>(null)
 
   // Incident Deletion State
   const [incidentToDelete, setIncidentToDelete] = useState<Incident | null>(null)
@@ -181,7 +182,6 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
       setAuthResult(null)
       setPlanError(null)
       setVerificationBanner(null)
-      setFeedbackResult(null)
       return
     }
 
@@ -189,7 +189,6 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
     setLoadingDetail(true)
     setPlanError(null)
     setVerificationBanner(null)
-    setFeedbackResult(null)
 
     api
       .getIncident(selectedIncident.incident_id)
@@ -314,10 +313,29 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
         verificationReason.trim() || undefined,
       )
 
-      setVerificationBanner({
-        type: 'success',
-        text: res.message || 'Verification decision recorded.',
-      })
+      if (decision === 'NEED_MORE_INFORMATION') {
+        if (res.email_sent) {
+          setVerificationBanner({
+            type: 'success',
+            text: `${res.message || 'Additional information requested.'} (Notification email dispatched to ${res.recipient_email_masked || 'registered citizen email'})`,
+          })
+        } else if (res.email_status === 'NO_RECIPIENT') {
+          setVerificationBanner({
+            type: 'warning',
+            text: 'Status saved as "Needs More Info", but no registered citizen email address was linked to this incident.',
+          })
+        } else {
+          setVerificationBanner({
+            type: 'error',
+            text: `Status saved as "Needs More Info", but email delivery failed: ${res.email_error || 'SMTP delivery issue'}.`,
+          })
+        }
+      } else {
+        setVerificationBanner({
+          type: 'success',
+          text: res.message || 'Verification decision recorded.',
+        })
+      }
       setVerificationReason('')
 
       // Reload list and details
@@ -405,37 +423,6 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
     }
   }
 
-  // Handle Situation Feedback
-  const handleFeedback = async () => {
-    if (!selectedIncident?.incident_id || !feedbackInput.trim()) return
-
-    setFeedbackSubmitting(true)
-    setFeedbackResult(null)
-
-    try {
-      const res = await api.submitFeedback(
-        selectedIncident.incident_id,
-        feedbackInput.trim(),
-      )
-      setFeedbackResult(
-        res.situation_changed
-          ? `Situation Escalation Detected! Additional needs identified: [${res.detected_needs.join(', ')}]. Replanning is required.`
-          : 'Feedback logged. No critical situation change detected.',
-      )
-      setFeedbackInput('')
-      await loadIncidents()
-      if (selectedIncident.incident_id) {
-        const updated = await api.getIncident(selectedIncident.incident_id)
-        setIncidentDetail(updated)
-      }
-    } catch (err) {
-      setFeedbackResult(
-        err instanceof Error ? `Feedback error: ${err.message}` : 'Failed to process feedback.',
-      )
-    } finally {
-      setFeedbackSubmitting(false)
-    }
-  }
 
   const isSelectedRejected =
     selectedIncident?.verification_status === 'REJECTED'
@@ -541,9 +528,18 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
             <Compass size={16} />
             <span>Tactical Map</span>
           </button>
+
+          <button
+            type="button"
+            className={`queue-tab ${activeQueue === 'analytics' ? 'active' : ''}`}
+            onClick={() => setActiveQueue('analytics')}
+          >
+            <BarChart3 size={16} />
+            <span>Visualizations &amp; Analytics</span>
+          </button>
         </div>
 
-        {activeQueue !== 'map' && (
+        {activeQueue !== 'map' && activeQueue !== 'analytics' && (
           <div className="queue-filters-bar">
             {/* Search filter */}
             <div className="queue-search-box">
@@ -559,8 +555,9 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
                   type="button"
                   onClick={() => setSearchQuery('')}
                   className="clear-search"
+                  aria-label="Clear search"
                 >
-                  &times;
+                  <X size={14} />
                 </button>
               )}
             </div>
@@ -587,8 +584,12 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
         )}
       </div>
 
-      {/* FULL MAP VIEW TAB */}
-      {activeQueue === 'map' ? (
+      {/* ANALYTICS & VISUALIZATIONS VIEW TAB */}
+      {activeQueue === 'analytics' ? (
+        <div style={{ padding: '24px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+          <AnalyticsDashboard />
+        </div>
+      ) : activeQueue === 'map' ? (
         <div className="authority-map-view-container">
           <InteractiveMap
             incidents={incidents}
@@ -842,11 +843,17 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
                 {verificationBanner && (
                   <div
                     className={`inspector-alert-banner ${
-                      verificationBanner.type === 'success' ? 'success' : 'danger'
+                      verificationBanner.type === 'success'
+                        ? 'success'
+                        : verificationBanner.type === 'warning'
+                        ? 'warning'
+                        : 'danger'
                     }`}
                   >
                     {verificationBanner.type === 'success' ? (
                       <CheckCircle2 size={18} />
+                    ) : verificationBanner.type === 'warning' ? (
+                      <AlertTriangle size={18} />
                     ) : (
                       <AlertCircle size={18} />
                     )}
@@ -945,6 +952,42 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
                           {incidentDetail.submitting_citizen.id}
                         </code>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Admin to Citizen Information Request Action */}
+                  <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn-glass"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 16px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        background: 'rgba(133, 84, 58, 0.25)',
+                        borderColor: 'var(--palette-camel)',
+                        cursor: incidentDetail?.submitting_citizen?.email && incidentDetail.submitting_citizen.email !== 'No linked citizen account' ? 'pointer' : 'not-allowed',
+                        opacity: incidentDetail?.submitting_citizen?.email && incidentDetail.submitting_citizen.email !== 'No linked citizen account' ? 1 : 0.6,
+                      }}
+                      disabled={!incidentDetail?.submitting_citizen?.email || incidentDetail.submitting_citizen.email === 'No linked citizen account'}
+                      onClick={() => setShowInfoRequestModal(true)}
+                      title={
+                        incidentDetail?.submitting_citizen?.email && incidentDetail.submitting_citizen.email !== 'No linked citizen account'
+                          ? 'Send official clarification email to citizen'
+                          : 'Cannot request information: Report was submitted anonymously with no linked citizen account'
+                      }
+                    >
+                      <Mail size={15} />
+                      <span>Request Clarification via Email</span>
+                    </button>
+                    {(!incidentDetail?.submitting_citizen?.email || incidentDetail.submitting_citizen.email === 'No linked citizen account') && (
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        (Anonymous report — email contact unavailable)
+                      </span>
                     )}
                   </div>
                 </section>
@@ -1104,6 +1147,18 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
                     decision.
                   </p>
 
+                  {(incidentDetail?.admin_feedback || selectedIncident.admin_feedback) && (
+                    <div className="current-feedback-callout" id="admin-current-feedback">
+                      <div className="current-feedback-label">
+                        <MessageSquare size={13} />
+                        <span>Current Admin Feedback / Information Request:</span>
+                      </div>
+                      <div className="current-feedback-text">
+                        {incidentDetail?.admin_feedback || selectedIncident.admin_feedback}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="verification-notes-group">
                     <label htmlFor="auth-reason">
                       Operational Rationale / Commander Notes (Optional)
@@ -1151,50 +1206,7 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
                   </div>
                 </section>
 
-                {/* Section 4: Situational Escalation & Feedback */}
-                <section className="inspector-section">
-                  <h3 className="section-title">
-                    <AlertTriangle size={16} />
-                    <span>Situational Update &amp; Escalation Feedback</span>
-                  </h3>
-                  <p className="section-desc">
-                    Record field updates or citizen feedback. Escalation keywords
-                    (e.g., "spreading", "trapped", "water") dynamically update
-                    incident needs and flag replanning requirements.
-                  </p>
-
-                  <div className="feedback-form-inline">
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g. 'Fire spreading to adjacent warehouse, 3 more people trapped, medical and water tankers required'"
-                      value={feedbackInput}
-                      onChange={(e) => setFeedbackInput(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      className="btn-primary-glow"
-                      onClick={() => void handleFeedback()}
-                      disabled={feedbackSubmitting || !feedbackInput.trim()}
-                    >
-                      {feedbackSubmitting ? (
-                        <RefreshCw size={15} className="spinner" />
-                      ) : (
-                        <ArrowRight size={15} />
-                      )}
-                      <span>Analyze Update</span>
-                    </button>
-                  </div>
-
-                  {feedbackResult && (
-                    <div className="feedback-result-note">
-                      <Sparkles size={14} />
-                      <span>{feedbackResult}</span>
-                    </div>
-                  )}
-                </section>
-
-                {/* Section 5: Response Planning & Authorization */}
+                {/* Section 4: Response Planning & Authorization */}
                 <section className="inspector-section response-plan-box">
                   <h3 className="section-title">
                     <Truck size={16} />
@@ -1606,6 +1618,23 @@ export const AuthorityWorkspace: React.FC<AuthorityWorkspaceProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Admin to Citizen Information Request Modal */}
+      {selectedIncident && (
+        <AdminInfoRequestModal
+          isOpen={showInfoRequestModal}
+          onClose={() => setShowInfoRequestModal(false)}
+          incidentId={selectedIncident.incident_id}
+          citizenName={incidentDetail?.submitting_citizen?.full_name}
+          citizenEmail={incidentDetail?.submitting_citizen?.email}
+          onSuccess={(res) => {
+            setVerificationBanner({
+              type: 'success',
+              text: `Information request successfully dispatched to citizen (${res.recipient_email_masked || 'delivered'}).`,
+            })
+          }}
+        />
       )}
     </div>
   )

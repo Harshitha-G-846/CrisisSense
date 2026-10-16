@@ -23,7 +23,13 @@ class VerificationResponse(BaseModel):
     decision: VerificationDecision
     verification_status: str
     reason: Optional[str] = None
+    admin_feedback: Optional[str] = None
     message: str
+    email_sent: Optional[bool] = None
+    email_status: Optional[str] = None
+    email_error: Optional[str] = None
+    recipient_email_masked: Optional[str] = None
+
 class FeedbackRequest(BaseModel):
     feedback: str = Field(
         min_length=1,
