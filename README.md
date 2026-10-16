@@ -1,3 +1,16 @@
+
+<p align="center">
+  <img
+    src="docs/images/crisissense-banner.png"
+    alt="CrisisSense — From fragmented reports to actionable intelligence"
+    width="100%"
+  />
+</p>
+
+---
+
+
+
 # CrisisSense 🚨
 ### An Agentic Multimodal Crisis Intelligence & Response Support System
 
