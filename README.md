@@ -1,424 +1,363 @@
-# CrisisSense
+# CrisisSense 🚨
+### An Agentic Multimodal Crisis Intelligence & Response Support System
 
-An Agentic Multimodal Crisis Intelligence and Response Support System.
+**Turning fragmented crisis reports into structured intelligence for faster, evidence-aware emergency response.**
 
-# Member 1: Crisis Analysis & Natural language processing
+CrisisSense is a crisis intelligence and response-support prototype designed to analyze incoming crisis reports, extract actionable information from multiple media formats, assess the currentness of supporting evidence, consolidate related reports into incidents, and recommend relevant response resources.
 
-## Overview
+By bringing together Natural Language Processing (NLP), multimodal evidence analysis, incident management, and resource recommendation, CrisisSense aims to help emergency response teams make better-informed decisions during rapidly evolving situations.
 
-Member 1 is responsible for the **text-based crisis analysis module** of CrisisSense.
-
-This module processes unstructured crisis-related text and converts it into structured information that can be used by the rest of the CrisisSense system.
-
-The module analyzes a text report and identifies:
-
-* Whether the text is related to a crisis
-* The type of incident
-* The type of information contained in the report
-* Severity of the incident
-* Required assistance or needs
-* Location mentioned in the report
-
-The output is returned as structured JSON through the CrisisSense backend API.
+> **Project status:** Research and working prototype. Automated analysis and recommendations are decision-support tools, not substitutes for emergency services or authorized human verification.
 
 ---
 
+## 📌 Table of Contents
 
-### Main components
-
-1. **Crisis Detection**
-
-   * Determines whether the input text represents a crisis-related report.
-   * Uses TF-IDF feature extraction with Logistic Regression.
-   * Trained using the CrisisLexT26 dataset.
-
-2. **Incident Type Classification**
-
-   * Identifies the type of incident mentioned in the text.
-   * Current categories include:
-
-     * Building Collapse
-     * Cyclone
-     * Earthquake
-     * Explosion
-     * Fire
-     * Flood
-     * Landslide
-     * Other
-     * Road Accident
-     * Wildfire
-
-3. **Information Type Classification**
-
-   * Identifies the type of information provided in a crisis-related message.
-   * Categories include:
-
-     * Affected individuals
-     * Caution and advice
-     * Donations and volunteering
-     * Infrastructure and utilities
-     * Other Useful Information
-     * Sympathy and support
-
-4. **Severity Detection**
-
-   * Extracts the severity level from the text.
-   * Current output levels:
-
-     * LOW
-     * MEDIUM
-     * HIGH
-
-5. **Needs Extraction**
-
-   * Identifies assistance requested in the text.
-   * Examples include:
-
-     * Rescue
-     * Medical assistance
-     * Food
-     * Water
-     * Shelter
-
-6. **Location Extraction**
-
-   * Detects locations mentioned in crisis reports.
-   * Supports Indian states, cities and predefined local locations.
-   * Uses normalization for capitalization and spacing differences.
-   * Uses fuzzy similarity matching to handle spelling mistakes.
-   * Uses OpenStreetMap Nominatim for geocoding and coordinates.
+- [The Problem](#-the-problem)
+- [Our Solution](#-our-solution)
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture)
+- [Core Modules](#-core-modules)
+- [Technology Stack](#-technology-stack)
+- [Machine Learning & Datasets](#-machine-learning--datasets)
+- [Getting Started](#-getting-started)
+- [API Documentation](#-api-documentation)
+- [Testing](#-testing)
+- [Project Structure](#-project-structure)
+- [Limitations & Responsible Use](#-limitations--responsible-use)
+- [Future Scope](#-future-scope)
+- [Contributing](#-contributing)
+- [Acknowledgements](#-acknowledgements)
 
 ---
 
-## Pipeline
+## 🌍 The Problem
 
-The Member 1 pipeline follows this flow:
+During emergencies, information often arrives through fragmented text messages, photographs, videos, audio recordings, and other unstructured sources.
 
-```text
-                Input Crisis Text
-                       |
-                       v
-              Text Preprocessing
-                       |
-          +------------+------------+
-          |            |            |
-          v            v            v
-   Crisis Detection  Incident   Information
-                     Type        Type
-                   Classification Classification
-          |            |            |
-          +------------+------------+
-                       |
-              +--------+--------+
-              |        |        |
-              v        v        v
-          Severity   Needs    Location
-              |        |        |
-              +--------+--------+
-                       |
-                       v
-              Structured JSON
-                       |
-                       v
-                 FastAPI API
+This creates several challenges:
+
+- **Information overload:** Responders must process large amounts of unstructured information.
+- **Uncertain credibility and currentness:** Previously circulated media may be mistaken for evidence of a current event.
+- **Fragmented incident reports:** Multiple reports may describe the same incident without being connected.
+- **Unclear response requirements:** Requested medical assistance, rescue, food, water, and shelter may be buried in unstructured messages.
+- **Location ambiguity:** Misspellings and inconsistent location names make it harder to identify where help is needed.
+- **Resource coordination:** Available resources must be matched to incident needs without assuming that a recommendation is an actual dispatch.
+
+CrisisSense explores how these challenges can be addressed through an integrated, multimodal crisis intelligence workflow.
+
+## 💡 Our Solution
+
+CrisisSense transforms incoming reports into structured, evidence-aware information that can support incident monitoring and response planning.
+
+The system combines four complementary modules:
+
+| Module | Responsibility |
+|---|---|
+| **01 — Crisis Analysis & NLP** | Detects crisis-related text and extracts incident categories, information types, severity, needs, and locations. |
+| **02 — Multimodal Evidence Verification** | Examines text, images, videos, and audio for temporal claims, contextual evidence, and potentially reused media. |
+| **03 — Incident & Resource Management** | Stores reports, consolidates related incidents, tracks incident status, and recommends potentially suitable response resources. |
+| **04 — Verification & Integration** | Supports the integration of verification-related workflows, schemas, and incident lifecycle requirements. |
+
+The modules work together through a FastAPI backend and a web-based frontend.
+
+## ✨ Key Features
+
+- 🧠 **AI-assisted crisis classification** using machine-learning-based text analysis.
+- 🗂️ **Structured incident extraction** for incident type, severity, information category, needs, and location.
+- 📍 **Location normalization and geocoding** with fuzzy matching and OpenStreetMap Nominatim.
+- 🖼️ **Multimodal evidence analysis** across supported text, image, video, and audio inputs.
+- 🕒 **Currentness assessment** using temporal claims and contextual evidence.
+- 🔎 **Reused-media detection** using perceptual hashing.
+- 🚨 **Incident consolidation** to connect related reports under incident records.
+- 🏥 **Resource recommendations** based on incident needs, availability, suitability rules, and geographic distance.
+- 📊 **Incident monitoring and analytics** through the frontend interface.
+- 🔐 **Authentication and verification-related workflows** integrated into the application.
+- 🧪 **Regression testing** for crisis analysis, API behavior, incident management, and application enhancements.
+
+*Feature availability and maturity vary by module. Automated assessments, currentness verdicts, and resource recommendations require appropriate human review.*
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TD
+    A["Incoming Crisis Reports"] --> B["Web Application"]
+    B --> C["FastAPI Backend"]
+
+    C --> D["Module 1: Crisis Analysis & NLP"]
+    C --> E["Module 2: Multimodal Evidence Analysis"]
+
+    D --> F["Structured Crisis Information"]
+    E --> G["Evidence & Currentness Assessment"]
+
+    F --> H["Module 3: Incident Management"]
+    G --> H
+
+    H --> I["Incident Records & Lifecycle"]
+    H --> J["Resource Recommendation Engine"]
+
+    I --> K["Command Center & Analytics"]
+    J --> K
+
+    K --> L["Human Review & Response Planning"]
 ```
+
+### High-level workflow
+
+1. Receive a crisis report through the application or API.
+2. Analyze text and supported media to extract relevant information.
+3. Assess evidence currentness and potential conflicts.
+4. Save eligible reports and consolidate related reports into incidents.
+5. Identify potentially suitable resources and unmet needs.
+6. Present the resulting information for review and response planning.
+
+The workflow is intended to support decision-making. It does not automatically establish that a reported emergency is genuine or authorize emergency dispatch.
+
+## 🧩 Core Modules
+
+### 1. Crisis Analysis & Natural Language Processing
+
+The NLP module converts unstructured crisis-related text into structured data.
+
+**Capabilities**
+
+- Crisis versus non-crisis classification.
+- Incident-type classification.
+- Information-type classification.
+- Severity extraction.
+- Assistance-needs extraction.
+- Location detection, normalization, and geocoding.
+
+**Incident categories**
+
+Building Collapse, Cyclone, Earthquake, Explosion, Fire, Flood, Landslide, Other, Road Accident, and Wildfire.
+
+**Information categories**
+
+Affected Individuals, Caution and Advice, Donations and Volunteering, Infrastructure and Utilities, Other Useful Information, and Sympathy and Support.
+
+**Techniques:** TF-IDF, Logistic Regression, LinearSVC, text preprocessing, fuzzy similarity matching, and geocoding.
+
+### 2. Multimodal Evidence & Currentness Verification
+
+This module examines available evidence to assess whether a crisis-related claim appears current, old, or uncertain.
+
+**Processing components**
+
+- Temporal claim extraction.
+- Contextual alignment with reference information.
+- Image metadata and OCR analysis.
+- Video frame sampling and OCR.
+- Speech-to-text extraction from audio.
+- Perceptual hashing for potentially reused images.
+- Deterministic evidence fusion and conflict detection.
+
+**Currentness outcomes**
+
+| Verdict | Meaning |
+|---|---|
+| `CURRENT` | Available evidence supports the currentness assessment. |
+| `OLD` | Available evidence supports an older or recycled context. |
+| `UNCERTAIN` | The available evidence is insufficient or conflicting. |
+
+The module also produces a heuristic confidence value, an action recommendation, and evidence provenance.
+
+These outputs are preliminary assessments, not calibrated probabilities or definitive proof. Human verification remains important, particularly when evidence conflicts or confidence is insufficient.
+
+### 3. Incident & Resource Management
+
+This module maintains incident records and supports response planning.
+
+**Capabilities**
+
+- Store reports and preserve analysis outputs.
+- Consolidate related reports into incidents.
+- Combine reported needs and retain the highest reported severity.
+- Track incident lifecycle status.
+- Browse and filter available resources.
+- Recommend potentially suitable resources and response departments.
+- Identify unmet needs when suitable resources are unavailable.
+
+The prototype uses geographic distance and predefined suitability rules to generate recommendations.
+
+**Important:** Recommendations do not allocate, reserve, or dispatch resources. Resource availability and coordinates may be simulated or illustrative.
+
+### 4. Verification & Application Integration
+
+The integration layer connects analysis results with incident lifecycle and verification-related workflows.
+
+It includes verification-related schemas, service logic, API integration, and frontend components intended to support the broader application workflow.
+
+Verification status and incident status are distinct concepts. Authorized human review is required before a report or incident should be treated as operationally verified.
 
 ---
 
-## Project Structure
+## 🛠️ Technology Stack
 
-```text
-backend/
-│
-├── member1/
-│   ├── __init__.py
-│   ├── data_preprocessing.py
-│   ├── crisis_classifier.py
-│   ├── incident_classifier.py
-│   ├── incident_type.py
-│   ├── location_extractor.py
-│   ├── severity.py
-│   ├── needs_extractor.py
-│   └── pipeline.py
-│
-├── data/
-│   ├── CrisisLexT26/
-│   └── crisissense_incident_type_dataset.csv
-│
-├── models/
-│   ├── crisis_classifier.pkl
-│   ├── tfidf_vectorizer.pkl
-│   ├── information_type_classifier.pkl
-│   ├── information_type_word_vectorizer.pkl
-│   ├── information_type_char_vectorizer.pkl
-│   ├── incident_type_classifier.pkl
-│   └── incident_type_vectorizer.pkl
-│
-├── main.py
-└── requirements.txt
+| Technology | Purpose |
+|---|---|
+| Python | Backend and analysis logic |
+| FastAPI | REST API |
+| Scikit-learn | Machine-learning models |
+| TF-IDF, Logistic Regression, LinearSVC | Text classification |
+| Pandas, NumPy, SciPy | Data processing and numerical operations |
+| Joblib | Model persistence |
+| OpenCV | Video processing |
+| Pillow | Image processing and metadata extraction |
+| Tesseract / pytesseract | Optical character recognition |
+| faster-whisper | Speech-to-text processing |
+| imagehash | Perceptual image hashing |
+| OpenStreetMap Nominatim | Location geocoding |
+| React, TypeScript | Frontend application |
+| CSS | User interface and theming |
+| SQLite / configured database | Prototype data persistence |
+| Pytest | Backend testing |
+| Node.js and npm | Frontend development and testing |
+
+The exact dependencies and external tools required for a particular module are defined by the project configuration.
+
+## 📊 Machine Learning & Datasets
+
+### Crisis detection
+
+The crisis classifier uses TF-IDF features with Logistic Regression and is trained using CrisisLexT26 data.
+
+| Metric | Reported result |
+|---|---:|
+| Test accuracy | 92.76% |
+
+### Information-type classification
+
+The information-type classifier combines word-level and character-level TF-IDF features with a LinearSVC model.
+
+| Metric | Reported result |
+|---|---:|
+| Test accuracy | 71.42% |
+
+These figures are previously reported prototype test results, not a guarantee of current performance or generalization to real-world emergencies. They should be interpreted alongside class-wise precision, recall, F1-score, and an appropriate evaluation methodology.
+
+### Incident-type classification
+
+A labelled incident-type dataset supports classification into ten incident categories. The model uses text features and a LinearSVC-based classification approach.
+
+### Dataset usage
+
+- **CrisisLexT26:** Crisis-related social media data used for crisis classification and information-type analysis, as well as contextual reference work.
+- **CrisisMMD:** Used for multimodal crisis-understanding research and text-image evaluation. It is not treated as a source of ground-truth temporal currentness labels.
+- **Synthetic resource data:** Used to demonstrate resource browsing and recommendation workflows in the prototype.
+
+Dataset preparation includes text cleaning, duplicate handling, label processing, and feature extraction where applicable.
+
+For responsible evaluation, model results should be reported with dataset provenance, train/test separation, class distributions, and suitable performance metrics.
+
+## 🚀 Getting Started
+
+The following instructions are for local development on Windows using PowerShell. Run backend and frontend commands in separate terminals.
+
+### Prerequisites
+
+Install the following tools as needed:
+
+- [Git](https://git-scm.com/)
+- [Python](https://www.python.org/)
+- [Node.js and npm](https://nodejs.org/)
+- [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) for OCR functionality
+- Additional model or media-processing dependencies required by the backend
+
+### 1. Clone the repository
+
+```powershell
+git clone https://github.com/Harshitha-G-846/CrisisSense.git
+cd CrisisSense
 ```
 
----
+### 2. Set up the backend
 
-## Dataset
+```powershell
+cd backend
 
-### CrisisLexT26
+py -m venv .venv
 
-The crisis detection and information-type classification components use the **CrisisLexT26** dataset.
-
-The dataset contains crisis-related tweets collected from multiple real-world crisis events.
-
-The preprocessing pipeline:
-
-1. Loads the event CSV files.
-2. Combines the datasets.
-3. Removes duplicate tweets.
-4. Cleans the text.
-5. Processes crisis/informativeness labels.
-6. Processes information-type labels.
-7. Generates training data for the classification models.
-
-### Dataset Statistics
-
-After preprocessing:
-
-```text
-Original records:       27,933
-Duplicate tweets:        2,625
-Processed records:      25,245
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-The processed dataset contains information such as:
+Initialize the database and import the prototype resource data:
 
-```text
-Tweet Text
-Information Source
-Information Type
-Informativeness
-Event
-Clean_Text
+```powershell
+.\.venv\Scripts\python.exe -m member3.init_db
+.\.venv\Scripts\python.exe -m member3.import_resources
 ```
 
----
+Place the required resource files, including `synthetic_resources.csv` and `anchors.csv`, in `backend/data/` if they are not already present.
 
-## Machine Learning Models
+**Database safety:** Initialization is intended to create missing tables; it is not a database migration tool. Back up existing data before making schema changes.
 
-### 1. Crisis Classifier
+### 3. Configure environment variables
 
-```text
-TF-IDF
-   ↓
-Logistic Regression
-   ↓
-Crisis / Not Crisis
-```
+Check the backend configuration and any available environment example file before starting the application.
 
-Current test accuracy:
+Create a local `.env` file only if required by the project configuration. Supply your own valid configuration values and credentials.
 
-```text
-92.76%
-```
+**Never commit `.env` files, API keys, passwords, database files containing private data, or other secrets to GitHub.**
 
-The model was trained using a stratified train/test split.
-
-> Note: Accuracy alone does not represent the complete model performance because the classes are imbalanced. Recall and F1-score should also be considered.
-
----
-
-### 2. Information Type Classifier
-
-The information-type classifier uses both word-level and character-level TF-IDF features.
-
-```text
-                 Input Text
-                     |
-          +----------+----------+
-          |                     |
-     Word TF-IDF          Character TF-IDF
-          |                     |
-          +----------+----------+
-                     |
-                   HStack
-                     |
-                LinearSVC
-                     |
-                     v
-             Information Type
-```
-
-Current test accuracy:
-
-```text
-71.42%
-```
-
----
-
-### 3. Incident Type Classifier
-
-The incident classifier identifies the type of crisis event.
-
-```text
-Input Text
-    ↓
-TF-IDF
-    ↓
-Linear SVM
-    ↓
-Incident Type
-```
-
-The current prototype uses a labelled incident-type dataset containing ten incident categories.
-
----
-
-## Location Extraction
-
-Location extraction is designed to handle variations in how users mention locations.
-
-### Exact matching
-
-```text
-Whitefield
-Chennai
-Assam
-Rajarajeshwari Nagar
-```
-
-### Case normalization
-
-The system treats different capitalization styles consistently:
-
-```text
-Whitefield
-WHITEFIELD
-whitefield
-WhItEfIeLd
-```
-
-### Spacing variations
-
-Location normalization can handle variations such as:
-
-```text
-Whitefield
-White Field
-```
-
-### Spelling variations
-
-Fuzzy similarity matching helps identify likely intended locations:
-
-```text
-Whitefeild  → Whitefield
-Chenai      → Chennai
-Hydrabad    → Hyderabad
-Mumabi      → Mumbai
-Banglore    → Bangalore
-```
-
-The similarity-based correction is applied against known location names rather than blindly correcting every word.
-
-### Geocoding
-
-After identifying a location, the system uses **OpenStreetMap Nominatim** to obtain:
-
-* Display name
-* City
-* State
-* Country
-* Latitude
-* Longitude
-
-The system is not restricted to Bengaluru and can identify locations from different parts of India.
-
----
-
-## Example
-
-### Input
-
-```text
-A fire has occurred near Whitefeild and people need medical assistance.
-```
-
-### Processing
-
-```text
-Crisis Detection
-       ↓
-Crisis = True
-
-Incident Classification
-       ↓
-Fire
-
-Severity Detection
-       ↓
-High
-
-Needs Extraction
-       ↓
-Medical assistance
-
-Location Extraction
-       ↓
-Whitefeild
-       ↓
-Fuzzy matching
-       ↓
-Whitefield
-       ↓
-Geocoding
-```
-
-### Output
-
-```json
-{
-  "is_crisis": true,
-  "incident_type": "Fire",
-  "information_type": "Affected individuals",
-  "severity": "HIGH",
-  "needs": [
-    "medical"
-  ],
-  "locations": [
-    {
-      "text": "Whitefield",
-      "city": "Bengaluru",
-      "state": "Karnataka",
-      "country": "India",
-      "latitude": 12.9957428,
-      "longitude": 77.7579489
-    }
-  ]
-}
-```
-
----
-
-## API
-
-The Member 1 pipeline is integrated with the CrisisSense FastAPI backend.
-
-### Start the backend
+### 4. Start the backend
 
 From the `backend` directory:
 
-```bash
-uvicorn main:app --reload
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
 ```
 
-The API is then available locally through the FastAPI server.
+The API should be available at:
 
-### Analyze text
+- API base URL: `http://127.0.0.1:8000`
+- Interactive Swagger documentation: `http://127.0.0.1:8000/docs`
+
+Keep this terminal running.
+
+### 5. Start the frontend
+
+Open a second PowerShell terminal and navigate to the project’s frontend directory:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open the local URL printed by the frontend development server.
+
+If the frontend cannot connect to the backend, check the API base URL and environment configuration in the frontend service files.
+
+> **First-run note:** Some model workflows may require model downloads, additional system dependencies, or configuration. Follow the relevant module requirements if a particular media-processing feature is unavailable.
+
+---
+
+## 🔌 API Documentation
+
+The FastAPI backend exposes endpoints for text analysis, report processing, incident management, resource browsing, and resource recommendations.
+
+The following endpoints are part of the documented prototype interface:
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/analyze-text` | Analyze and save a text report, with incident consolidation where applicable. |
+| `POST` | `/analyze` | Analyze supported report inputs and media; save and consolidate when text is supplied. |
+| `GET` | `/incidents` | List incidents and report counts. |
+| `GET` | `/incidents/{incident_id}` | Retrieve incident details and linked report evidence. |
+| `GET` | `/resources` | Browse resources using pagination and filters. |
+| `GET` | `/incidents/{incident_id}/resources` | Retrieve resource and department recommendations. |
+| `PATCH` | `/incidents/{incident_id}/status` | Update incident lifecycle status. |
+
+### Example: Analyze a text report
+
+**Request**
 
 ```http
-POST /analyze
+POST /analyze-text
+Content-Type: application/json
 ```
-
-Request:
 
 ```json
 {
@@ -426,227 +365,143 @@ Request:
 }
 ```
 
-The API returns the structured crisis analysis generated by the Member 1 pipeline.
+The response contains structured analysis generated by the backend. Exact response fields depend on the API schema and the analysis results.
+
+### Interactive API documentation
+
+Start the backend and visit:
+
+[`http://127.0.0.1:8000/docs`](http://127.0.0.1:8000/docs)
+
+Swagger UI provides the available routes, request schemas, response schemas, and an interface for trying supported endpoints.
 
 ---
 
-## Technologies Used
+## 🧪 Testing
 
-| Technology              | Purpose                    |
-| ----------------------- | -------------------------- |
-| Python                  | Core development           |
-| Scikit-learn            | Machine learning           |
-| TF-IDF                  | Text feature extraction    |
-| Logistic Regression     | Crisis classification      |
-| LinearSVC               | Text classification        |
-| Pandas                  | Dataset processing         |
-| NumPy                   | Numerical operations       |
-| SciPy                   | Sparse feature combination |
-| Joblib                  | Model saving/loading       |
-| FastAPI                 | Backend API                |
-| Requests                | External API requests      |
-| OpenStreetMap Nominatim | Location geocoding         |
+CrisisSense includes backend regression tests and frontend tests for selected features and workflows.
+
+### Backend
+
+From the project root, with the backend dependencies installed:
+
+```powershell
+python -m pytest backend/tests -q
+```
+
+Alternatively, use the Python interpreter from the backend virtual environment.
+
+### Frontend tests
+
+```powershell
+cd frontend
+npm test
+```
+
+### Production build
+
+```powershell
+npm run build
+```
+
+Test coverage and results may change as the project evolves. A passing test suite validates the scenarios covered by those tests; it does not establish real-world emergency-response accuracy or readiness for operational deployment.
 
 ---
 
+## 📁 Project Structure
 
-
-## Member 2: Multimodal & Currentness Verification
-
-Member 2 is responsible for extracting multimodal evidence from fragmented crisis inputs (text, images, videos, audio) and performing explainable currentness verification.
-
-### Pipeline Architecture
-
-```
-Input (Text, Image, Video, Audio, Context)
-  │
-  ├── Temporal Claim Extraction (temporal.py)
-  ├── Contextual Corpus Alignment (reference.py)
-  ├── Image Metadata & Visual OCR (ocr.py)
-  ├── Video Frame Sampling & OCR (video.py)
-  ├── Spoken Audio Speech-to-Text Claims (audio.py)
-  └── Perceptual Reused-Media Detection (reuse.py)
-        │
-        ▼
-   Evidence Aggregation (List[EvidenceItem])
-        │
-        ▼
-   Deterministic Evidence Fusion (fusion.py)
-        │
-        ▼
-   CurrentnessResult
-   ├── Verdict: CURRENT | OLD | UNCERTAIN
-   ├── Confidence: [0.0, 1.0] (heuristic)
-   ├── Action: ALLOW | HUMAN_VERIFICATION_REQUIRED
-   ├── Conflicts Detected: List[str]
-   └── Full Evidence Provenance
+```text
+CrisisSense/
+├── backend/
+│   ├── main.py
+│   ├── auth.py
+│   ├── email_service.py
+│   ├── requirements.txt
+│   ├── data/
+│   ├── models/
+│   ├── member1/              # Crisis analysis and NLP
+│   ├── member2/              # Multimodal evidence analysis
+│   ├── member3/              # Incident and resource management
+│   ├── member4/              # Verification and integration
+│   └── tests/                # Backend regression tests
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── context/
+│   │   ├── services/
+│   │   ├── App.tsx
+│   │   └── main.tsx
+│   └── package.json
+│
+└── README.md
 ```
 
-### Core Technologies
-- **Python**: Core runtime and Pydantic schemas.
-- **OpenCV (`cv2`)**: Video decoding, frame sampling, and metadata inspection.
-- **Pillow (`PIL`)**: Image loading, EXIF extraction, and format conversions.
-- **Tesseract / `pytesseract`**: Optical character recognition for image and video frame timestamps/tickers.
-- **`faster-whisper`**: Local, offline speech-to-text transcription for spoken temporal assertions.
-- **Perceptual Hashing (`imagehash`)**: pHash computation and Hamming distance matching for reused/recycled media detection.
+*This is a high-level overview. Individual filenames and subdirectories may differ as the project evolves.*
 
-### Dataset Scope & Research Limitations
-- **CrisisMMD**: Used strictly for multimodal crisis understanding and multimodal text+image evaluation. CrisisMMD does **not** provide ground-truth temporal currentness labels and is not treated as a direct currentness dataset.
-- **CrisisLexT26**: Used as a local reference corpus for historical crisis event metadata and contextual alignment.
-- **Heuristic Fusion**: Decision boundaries, source reliability weights, and confidence values are deterministic heuristic baselines designed for safety; empirical calibration is conducted in Phase 11.
+---
 
+## ⚠️ Limitations & Responsible Use
 
-# Member 3: Incident and Resource Management
+CrisisSense is a prototype intended for research, demonstration, and further development.
 
-## Responsibilities
+- **Currentness verification is heuristic:** Verdicts and confidence values are not independently validated guarantees of truth.
+- **Resource information may be simulated:** Resource availability and coordinates should not be assumed to reflect real emergency infrastructure.
+- **Recommendations are not dispatches:** Human approval and operational coordination remain necessary.
+- **Location matching can be ambiguous:** A matching location name does not necessarily identify the exact incident site.
+- **Model performance is dataset-dependent:** Reported test accuracy may not generalize to new events, regions, languages, or communication styles.
+- **Incident consolidation uses provisional rules:** Distance, time, and text-similarity thresholds require further validation.
+- **Authentication and authorization require careful review:** Sensitive operational deployments need appropriate access controls, auditing, and verification procedures.
+- **Privacy and data handling matter:** Crisis reports may contain personal information or sensitive evidence. Appropriate retention, consent, access, and deletion policies are essential.
 
-- Store reports and preserve Member 1 and Member 2 outputs.
-- Consolidate related reports into incidents.
-- Update incident needs, severity, and timestamps.
-- Store synthetic response resources.
-- Recommend available nearby resources and response departments.
-- Provide incident, resource, and lifecycle APIs.
+CrisisSense should not be used as the sole basis for emergency dispatch, evacuation, medical decisions, or other high-impact actions.
 
-## Setup on Windows
+If you are experiencing an actual emergency, contact the appropriate local emergency services.
 
-Run these commands from the backend folder:
+## 🔮 Future Scope
 
-```powershell
-py -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m member3.init_db
-.\.venv\Scripts\python.exe -m member3.import_resources
-.\.venv\Scripts\python.exe -m uvicorn main:app --port 8000
-```
+Potential directions for further development include:
 
-Place synthetic_resources.csv and anchors.csv in backend/data.
+- Improved multilingual crisis detection and location extraction.
+- Evaluation of currentness verification against appropriately labelled datasets.
+- Better detection of conflicting evidence and recycled media.
+- Human-in-the-loop verification and auditable incident review.
+- More robust incident deduplication and ambiguity handling.
+- Resource recommendations informed by verified capacity and road-network travel times.
+- Stronger authentication, authorization, and audit trails.
+- Improved privacy controls and secure media handling.
+- Expanded automated tests, reproducible evaluation, and deployment monitoring.
+- Integration with trusted, authorized emergency-management data sources.
 
-The first model use may require downloads. OCR also requires the
-external Tesseract application; installing pytesseract alone does
-not install it.
+These are potential improvements, not claims that every capability is already implemented.
 
-Swagger documentation: http://127.0.0.1:8000/docs
+## 🤝 Contributing
 
-init_db creates missing tables without deleting existing records.
-It does not migrate existing table columns.
+Contributions, suggestions, bug reports, and improvements are welcome.
 
-The resource importer inserts missing IDs and preserves existing
-records and availability on repeated runs.
+1. Fork the repository.
+2. Create a feature branch.
+3. Make focused changes and add tests where appropriate.
+4. Run the relevant backend tests and frontend checks.
+5. Open a pull request describing the change and its impact.
 
-## APIs
+Please avoid committing credentials, private datasets, sensitive incident information, or generated database files.
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| POST | /analyze-text | Analyze, save, and consolidate a text report |
-| POST | /analyze | Analyze optional media; save and consolidate when text is supplied |
-| GET | /incidents | List incidents and report counts |
-| GET | /incidents/{incident_id} | Read incident details and linked report evidence |
-| GET | /resources | Browse resources with pagination and filters |
-| GET | /incidents/{incident_id}/resources | Recommend resources and departments |
-| PATCH | /incidents/{incident_id}/status | Update lifecycle status |
+## 🙌 Acknowledgements
 
-Resource browsing parameters:
-limit (1–100), offset, resource_type, availability.
+CrisisSense builds on open-source software and research resources, including:
 
-Recommendation parameters:
-radius_km (greater than 0, up to 100), per_need (1–10).
+- [CrisisLex](https://crisislex.org/) — crisis-related social media datasets and research.
+- [CrisisMMD](https://crisisnlp.qcri.org/crisismmd) — multimodal crisis dataset research.
+- [OpenStreetMap](https://www.openstreetmap.org/) and [Nominatim](https://nominatim.org/) — geographic data and geocoding.
+- [Scikit-learn](https://scikit-learn.org/) — machine-learning tools.
+- [FastAPI](https://fastapi.tiangolo.com/) — API framework.
+- [React](https://react.dev/) — frontend library.
 
-## Consolidation rules
+Please consult the original dataset and software licenses and attribution requirements before redistributing data or deploying the system.
 
-Candidates must be OPEN or IN_PROGRESS and not REJECTED.
-They must have the same incident type, matching location names,
-and coordinates within 1 km.
+---
 
-Candidate reports must have been received during the preceding
-24 hours. This uses receipt time, not verified event time.
+**Built as a prototype exploring how AI-assisted crisis intelligence can support more informed emergency response.**
 
-A unique exact-text match is preferred. Otherwise, a unique
-incident with a report similarity score of at least 0.80 is used.
-
-The distance, time, and similarity settings are provisional.
-They have not been validated as operational thresholds.
-
-Non-crisis and OLD reports remain saved without an incident.
-Multiple possible matches currently lead to a new PENDING
-incident; there is no dedicated ambiguity-review workflow yet.
-
-Newly linked reports combine needs, retain the highest reported
-severity, and update the timestamp.
-
-## Resource recommendations
-
-Recommendations use capabilities, availability, straight-line
-distance, and initial resource-type suitability rules.
-
-The default radius is 25 km. Only AVAILABLE resources qualify.
-Unfulfilled needs appear in unmet_needs.
-
-For fire incidents:
-- Fire suppression requires a fire unit.
-- Rescue candidates are fire units or rescue teams.
-- Medical candidates are ambulances or medical teams.
-
-Candidate lists do not allocate or reserve resources. One resource
-can appear under multiple needs. Recommendations require human
-approval and do not trigger dispatch.
-
-Departments are prototype categories, not verified local offices.
-
-## Member 4 integration
-
-Lifecycle values: OPEN, IN_PROGRESS, RESOLVED.
-
-Verification values expected by this module:
-PENDING, VERIFIED, REJECTED.
-
-IN_PROGRESS requires verification_status to be VERIFIED.
-Member 4 must implement the authorized human-verification
-workflow and agree on these values before integration.
-
-Status updates currently have no authentication, authorization,
-or audit history. They are intended for local prototype testing.
-
-Incident-detail timestamps explicitly include the UTC offset.
-The frontend can convert them to IST for display.
-
-## Dataset
-
-synthetic_resources.csv contains 5,006 fictional resources.
-anchors.csv provides supporting geographic metadata.
-
-Resource availability is simulated. Coordinates are illustrative
-and unverified. Regional coverage does not establish exhaustive
-coverage or nationwide operational effectiveness.
-
-The current importer stores only fields supported by Resource.
-Additional state, capacity, and provenance fields remain in CSV.
-
-## Known limitations
-
-- Media-only submissions are analyzed but not stored.
-- Original uploaded media is deleted after processing.
-- Unassigned reports have no dedicated review-list API.
-- Locality coordinates may represent multiple separate events.
-- Similarity thresholds need labelled evaluation.
-- Incident updates do not invalidate earlier human verification.
-- Resource suitability rules are incomplete for other scenarios.
-- Recommendations do not consider road travel time or capacity.
-- Incident lists and linked-report responses are not paginated.
-- Concurrent submissions may create duplicate incidents.
-
-## Checks
-
-```powershell
-.\.venv\Scripts\python.exe -m member3.test_location_matching
-.\.venv\Scripts\python.exe -m member3.test_incident_update
-.\.venv\Scripts\python.exe -m member3.test_similarity
-```
-
-The similarity script prints example scores; it is not a benchmark.
-test_save_report writes a sample report into the configured database.
-
-Manual API checks covered repeated and reworded reports, separate
-locations, resource filtering, shortages, lifecycle restrictions,
-incident details, and a text-and-image submission.
-These checks establish prototype behavior for the tested cases,
-not real-world accuracy or publication readiness.
+[Repository](https://github.com/Harshitha-G-846/CrisisSense) · [Report an issue](https://github.com/Harshitha-G-846/CrisisSense/issues) · [Explore the API](#-api-documentation)
